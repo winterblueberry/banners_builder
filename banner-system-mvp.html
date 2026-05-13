@@ -1,0 +1,2613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Promotional Banner System — MVP</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0E1116;
+    --panel: #161B22;
+    --panel-2: #1C232C;
+    --border: #2A323D;
+    --border-strong: #3A4452;
+    --ink: #E6EDF3;
+    --ink-2: #B8C2CC;
+    --ink-3: #8B95A1;
+    --accent: #4F7BFF;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .app {
+    position: relative;
+    height: 100vh;
+    overflow: hidden;
+  }
+  .canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100vh;
+  }
+  .sidebar {
+    position: absolute;
+    top: 0; left: 0; bottom: 0;
+    width: 340px;
+    z-index: 30;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.45);
+    transition: transform 0.22s cubic-bezier(0.2, 0, 0, 1);
+  }
+  .app.sidebar-hidden .sidebar {
+    transform: translateX(-100%);
+    box-shadow: none;
+  }
+
+  .show-sidebar-btn {
+    position: fixed;
+    top: 14px; left: 14px;
+    z-index: 50;
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--ink-2);
+    cursor: pointer;
+    font-size: 16px;
+    font-family: inherit;
+    display: none;
+    align-items: center; justify-content: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    transition: background 0.15s, color 0.15s;
+  }
+  .show-sidebar-btn:hover { background: var(--border); color: var(--ink); }
+  .app.sidebar-hidden .show-sidebar-btn { display: flex; }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar {
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Persistent header */
+  .sidebar-header {
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+    flex-shrink: 0;
+  }
+  .sidebar-header h1 {
+    font-size: 14px; font-weight: 700; letter-spacing: 0.04em;
+    text-transform: uppercase; color: var(--ink-2);
+    margin: 0;
+  }
+  .brand-row {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .icon-btn {
+    width: 28px; height: 28px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--ink-2);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-family: inherit;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s, color 0.15s;
+  }
+  .icon-btn:hover { background: var(--border); color: var(--ink); }
+  .header-pill-row {
+    display: grid;
+    grid-template-columns: 56px 1fr;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .header-pill-label {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--ink-3);
+  }
+  .seg-mini button { font-size: 11px; padding: 5px 8px; }
+
+  .save-status.mini {
+    margin-top: 8px;
+    padding: 0;
+    font-size: 10px;
+  }
+
+  /* Tab bar */
+  .sidebar-tabs {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 0 8px;
+    flex-shrink: 0;
+  }
+  .sidebar-tabs .tab {
+    background: transparent;
+    border: 0;
+    color: var(--ink-3);
+    padding: 12px 4px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .sidebar-tabs .tab:hover { color: var(--ink-2); }
+  .sidebar-tabs .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  /* Scrollable panel body */
+  .sidebar-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 18px 80px;
+  }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .panel-meta {
+    font-size: 11px;
+    color: var(--ink-3);
+    margin-bottom: 16px;
+    padding: 6px 10px;
+    background: var(--panel-2);
+    border-radius: 6px;
+    border-left: 2px solid var(--accent);
+  }
+  .panel-meta strong {
+    color: var(--ink-2);
+    font-weight: 600;
+  }
+  .panel-sub-title {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--ink-3);
+    margin: 24px 0 12px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .tab-panel > .panel-meta + .field,
+  .tab-panel > .panel-meta + .toggle-row,
+  .tab-panel > .panel-meta + .banner-tabs { margin-top: 0; }
+
+  /* Screenshot slot */
+  .ss-slot {
+    margin-bottom: 16px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .ss-slot:last-child { border-bottom: 0; }
+  .ss-slot-label {
+    font-size: 12px; font-weight: 600;
+    color: var(--ink-2);
+    margin-bottom: 8px;
+  }
+
+  /* Save & Load drawer */
+  .drawer-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 100;
+    opacity: 1;
+    transition: opacity 0.2s;
+  }
+  .drawer-backdrop.hidden { opacity: 0; pointer-events: none; }
+
+  .save-drawer {
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    width: 340px;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    box-shadow: 4px 0 24px rgba(0,0,0,0.4);
+    z-index: 101;
+    transform: translateX(0);
+    transition: transform 0.25s cubic-bezier(0.2, 0, 0, 1);
+    display: flex; flex-direction: column;
+  }
+  .save-drawer.hidden { transform: translateX(-100%); }
+  .drawer-header {
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .drawer-header h2 {
+    font-size: 13px; font-weight: 700; letter-spacing: 0.04em;
+    text-transform: uppercase; color: var(--ink-2);
+    margin: 0;
+  }
+  .drawer-body { padding: 18px; }
+  .preset-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(79,123,255,0.15);
+    border: 1px solid rgba(79,123,255,0.35);
+    color: var(--accent);
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 6px;
+  }
+
+  .group {
+    border-top: 1px solid var(--border);
+    padding-top: 16px; margin-top: 16px;
+  }
+  .group:first-of-type { border-top: 0; padding-top: 0; margin-top: 0; }
+  .group-title {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--ink-3);
+    margin-bottom: 10px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .group-title .scope {
+    font-size: 9px; font-weight: 600; letter-spacing: 0.04em;
+    color: var(--ink-3);
+    background: var(--panel-2);
+    padding: 2px 6px; border-radius: 4px;
+    text-transform: uppercase;
+  }
+  label.field {
+    display: block; margin-bottom: 12px;
+  }
+  label.field > span {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 12px; color: var(--ink-2); margin-bottom: 6px;
+  }
+  label.field > span strong {
+    color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums;
+  }
+
+  input[type="text"], input[type="number"], textarea, select {
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--ink);
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  input[type="text"]:focus, input[type="number"]:focus,
+  textarea:focus, select:focus {
+    border-color: var(--accent);
+  }
+  textarea { resize: vertical; min-height: 56px; }
+
+  input[type="color"] {
+    width: 100%; height: 36px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--panel-2);
+    padding: 2px;
+    cursor: pointer;
+  }
+
+  input[type="range"] {
+    width: 100%;
+    accent-color: var(--accent);
+  }
+
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  .seg {
+    display: flex; background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px; padding: 2px; gap: 2px;
+  }
+  .seg button {
+    flex: 1; background: transparent; border: 0;
+    color: var(--ink-2); padding: 6px 8px;
+    font-size: 12px; font-weight: 500; cursor: pointer;
+    border-radius: 6px;
+    font-family: inherit;
+    transition: all 0.15s;
+  }
+  .seg button.active {
+    background: var(--accent);
+    color: white;
+  }
+  .seg button:not(.active):hover { color: var(--ink); }
+
+  .stepper {
+    display: grid; grid-template-columns: 32px 1fr 32px; gap: 6px;
+    align-items: center;
+  }
+  .stepper button {
+    height: 32px; background: var(--panel-2);
+    border: 1px solid var(--border); color: var(--ink);
+    border-radius: 8px; cursor: pointer; font-size: 16px;
+    font-family: inherit;
+  }
+  .stepper button:hover:not(:disabled) { border-color: var(--border-strong); }
+  .stepper button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .stepper .val {
+    text-align: center; font-size: 13px; font-weight: 600;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px; height: 32px; line-height: 30px;
+  }
+
+  .banner-tabs {
+    display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 12px;
+  }
+  .banner-tab {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--ink-2);
+    padding: 5px 10px; border-radius: 999px;
+    font-size: 12px; font-weight: 500; cursor: pointer;
+    font-family: inherit;
+  }
+  .banner-tab.active {
+    background: var(--accent);
+    color: white; border-color: var(--accent);
+  }
+
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 10px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 8px;
+  }
+  .toggle-row span { font-size: 12px; color: var(--ink-2); }
+  .switch {
+    position: relative; width: 36px; height: 20px;
+    background: #3A4452; border-radius: 999px; cursor: pointer;
+    transition: background 0.15s;
+    flex-shrink: 0;
+  }
+  .switch::after {
+    content: ''; position: absolute;
+    width: 16px; height: 16px;
+    background: white; border-radius: 50%;
+    top: 2px; left: 2px;
+    transition: transform 0.15s;
+  }
+  .switch.on { background: var(--accent); }
+  .switch.on::after { transform: translateX(16px); }
+
+  .upload {
+    border: 1px dashed var(--border-strong);
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+    color: var(--ink-3);
+    font-size: 12px;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .upload:hover { border-color: var(--accent); color: var(--ink-2); }
+  .upload input { display: none; }
+
+  .asset-preview {
+    margin-top: 8px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .asset-preview img {
+    width: 48px; height: 48px; object-fit: cover; border-radius: 6px;
+    background: #000;
+  }
+  .asset-preview .meta { font-size: 11px; color: var(--ink-3); flex: 1; word-break: break-all; }
+  .asset-preview button {
+    background: transparent; border: 0; color: var(--ink-3);
+    cursor: pointer; font-size: 18px;
+  }
+  .asset-preview button:hover { color: #ff6b6b; }
+
+  .swatch-row {
+    display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px;
+    margin-top: 6px;
+  }
+  .swatch {
+    aspect-ratio: 1; border-radius: 6px; cursor: pointer;
+    border: 2px solid transparent;
+    transition: transform 0.1s;
+  }
+  .swatch:hover { transform: scale(1.08); }
+
+  .hint {
+    font-size: 11px; color: var(--ink-3);
+    margin-top: 6px; line-height: 1.4;
+  }
+
+  /* Save / Load buttons */
+  .btn-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+    margin-bottom: 8px;
+  }
+  .btn-row.three { grid-template-columns: 1fr 1fr 1fr; }
+  .btn {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--ink);
+    padding: 8px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .btn:hover { border-color: var(--border-strong); }
+  .btn.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .btn.primary:hover { filter: brightness(1.1); }
+  .btn.danger {
+    color: #F87171;
+  }
+  .btn.danger:hover { border-color: #F87171; }
+  .save-status {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; color: var(--ink-3);
+    margin-top: 4px;
+  }
+  .save-status .dot-status {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #10B981;
+  }
+  .save-status.error .dot-status { background: #EF4444; }
+  .save-status.dirty .dot-status { background: #F59E0B; }
+
+  .counter {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+  }
+  .counter.over { color: #F59E0B; }
+  .counter.way-over { color: #EF4444; }
+
+  .mini-row {
+    display: grid;
+    grid-template-columns: 36px 1fr 44px;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .mini-row label { font-size: 11px; color: var(--ink-3); }
+  .mini-row .v { font-size: 11px; text-align: right; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+
+  .typo-block {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 10px;
+  }
+  .typo-block .typo-title {
+    font-size: 12px; color: var(--ink-2); font-weight: 600; margin-bottom: 8px;
+  }
+
+  .odds-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+  .odds-row input { font-size: 12px; padding: 6px 8px; }
+
+  .config-block {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 10px;
+  }
+  .config-block-title {
+    font-size: 11px; color: var(--ink-3); font-weight: 600; letter-spacing: 0.04em;
+    text-transform: uppercase; margin-bottom: 8px;
+  }
+
+  /* ---------- Canvas / Viewport ---------- */
+  .canvas {
+    position: relative;
+    overflow: hidden;
+    background:
+      radial-gradient(circle at 20% 0%, rgba(79,123,255,0.08), transparent 40%),
+      radial-gradient(circle at 80% 100%, rgba(46,91,255,0.06), transparent 40%),
+      var(--bg);
+    display: flex;
+    flex-direction: column;
+  }
+  .topbar {
+    height: 56px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(22,27,34,0.6);
+    backdrop-filter: blur(10px);
+    display: flex; align-items: center;
+    padding: 0 20px; gap: 16px;
+    z-index: 5;
+    flex-shrink: 0;
+  }
+  .topbar .title { font-size: 13px; font-weight: 600; color: var(--ink); }
+  .topbar .meta { font-size: 12px; color: var(--ink-3); margin-left: auto; font-variant-numeric: tabular-nums; }
+
+  .viewport-wrap {
+    flex: 1;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 28px 16px;
+    overflow: auto;
+  }
+  /* Desktop preset: no outer padding, frame fills the canvas edge-to-edge */
+  .viewport-wrap:has(.device-frame.is-desktop) { padding: 0; }
+  .device-frame {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: padding 0.2s ease, background 0.2s ease;
+    position: relative;
+  }
+  .device-frame .browser-chrome { display: none; }
+  .device-frame.is-desktop .browser-chrome { display: flex; }
+  .device-screen {
+    width: var(--device-w, 1200px);
+    min-width: 320px;
+    max-width: calc(100vw - 380px);
+    display: flex;
+    flex-direction: column;
+    transition: width 0.2s ease;
+  }
+  .viewport {
+    position: relative;
+    width: 100%;
+  }
+  .context-image-wrap {
+    width: 100%;
+    background: #fff;
+    overflow: hidden;
+  }
+  .context-image-wrap img {
+    width: 100%;
+    display: block;
+  }
+  .context-image-wrap.hidden { display: none; }
+
+  /* Tablet mockup — rounded rectangle, slim bezel, no notch */
+  .device-frame.is-tablet {
+    background: #1a1d24;
+    padding: 14px;
+    border-radius: 28px;
+    border: 1px solid #2A323D;
+    box-shadow:
+      0 30px 60px rgba(0,0,0,0.55),
+      inset 0 0 0 1px rgba(255,255,255,0.04);
+  }
+  .device-frame.is-tablet .device-screen {
+    background: #fff;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  /* Desktop — no mockup chrome; full screen space */
+  .device-frame.is-desktop {
+    background: transparent;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    width: 100%;
+  }
+  .device-frame.is-desktop .device-screen {
+    width: 100%;
+    max-width: none;
+    background: #fff;
+    overflow: hidden;
+  }
+  .device-frame.is-desktop .browser-chrome { display: none; }
+
+  /* Phone mockup — only on mobile preset */
+  .device-frame.is-phone {
+    background: #1a1d24;
+    padding: 14px 8px 8px;
+    border-radius: 44px;
+    border: 1px solid #2A323D;
+    box-shadow:
+      0 30px 60px rgba(0,0,0,0.55),
+      inset 0 0 0 1px rgba(255,255,255,0.04);
+    position: relative;
+  }
+  .device-frame.is-phone::before {
+    content: '';
+    position: absolute;
+    top: 22px; left: 50%;
+    transform: translateX(-50%);
+    width: 96px; height: 24px;
+    background: #0a0d12;
+    border-radius: 14px;
+    z-index: 100;
+  }
+  .device-frame.is-phone .device-screen {
+    background: #fff;
+    border-radius: 32px;
+    overflow: hidden;
+  }
+  .device-frame.is-phone .viewport {
+    padding: 12px 0 0 12px; /* top right bottom left — banner sticks to right edge */
+  }
+  .device-frame.is-phone .pagination-wrap {
+    padding-bottom: 4px;
+  }
+
+  /* ---------- Carousel ---------- */
+  .carousel {
+    position: relative;
+    overflow: visible;
+  }
+  .track-clip { overflow: hidden; }
+  .track {
+    display: flex;
+    gap: var(--gap, 12px);
+    transition: transform 0.5s cubic-bezier(0.2, 0, 0, 1);
+    will-change: transform;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .track { transition: none; }
+  }
+  .slide {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.94);
+    border: 0;
+    color: #0B1220;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+    z-index: 5;
+    font-family: inherit;
+    transition: opacity 0.18s, background 0.18s;
+  }
+  .arrow.prev { left: 12px; }
+  .arrow.next { right: 12px; }
+  .arrow:hover { background: white; }
+  .arrow:disabled { opacity: 0; pointer-events: none; }
+  .viewport.is-mobile .arrow { display: none; }
+
+  .pagination-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    margin-top: 18px;
+  }
+  .pagination {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+  }
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: rgba(11,18,32,0.28);
+    border: 0; padding: 0; cursor: pointer;
+    transition: width 0.2s, background 0.2s;
+  }
+  .dot.active {
+    width: 22px; border-radius: 4px;
+    background: #0B1220;
+  }
+  .progress { display: none !important; }
+
+  /* ---------- Banner component ---------- */
+  .banner {
+    position: relative;
+    overflow: hidden;
+    color: #fff;
+    cursor: pointer;
+    border-radius: var(--radius, 12px);
+    isolation: isolate;
+    height: var(--banner-h, 300px);
+    container-type: inline-size;
+  }
+
+  .banner-bg { position: absolute; inset: 0; z-index: 0; }
+
+  /* Asset image — same behavior on mobile/tablet/desktop */
+  .banner-asset {
+    position: absolute;
+    top: 0; bottom: 0; right: 0;
+    width: var(--asset-w, 50%);
+    z-index: 1;
+    display: block;
+    pointer-events: none;
+    overflow: visible; /* allow image to overflow; banner clips */
+  }
+  .banner-asset img {
+    width: 100%;
+    height: 100%;
+    object-fit: var(--asset-fit, contain);
+    object-position: var(--asset-px, 50%) var(--asset-py, 50%);
+    transform: scale(var(--asset-scale, 1));
+    transform-origin: var(--asset-px, 50%) var(--asset-py, 50%);
+    display: block;
+  }
+  .banner-asset.bleed {
+    width: 100%;
+  }
+  .banner-asset.bleed img {
+    object-fit: var(--asset-fit, cover);
+  }
+
+  .content-slot {
+    position: relative;
+    z-index: 3;
+    width: var(--content-w, 50%);
+    height: 100%;
+    display: flex; flex-direction: column;
+    justify-content: center;
+    padding: 5% 5%;
+    gap: 10px;
+    min-width: 0;
+  }
+  .banner.has-bottom-odds .content-slot {
+    padding-bottom: 80px;
+  }
+
+  .badge {
+    display: inline-flex; align-self: flex-start;
+    padding: 4px 10px;
+    background: rgba(255,255,255,0.18);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.28);
+    border-radius: 999px;
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .headline {
+    font-size: var(--headline-size, clamp(18px, 4.2cqw, 44px));
+    font-weight: 800;
+    line-height: 1.05;
+    margin: 0;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.18);
+  }
+  .body {
+    font-size: var(--body-size, clamp(11px, 1.6cqw, 16px));
+    line-height: 1.45;
+    margin: 0;
+    opacity: 0.92;
+    max-width: 56ch;
+  }
+  .cta {
+    display: inline-flex; align-self: flex-start;
+    align-items: center; gap: 6px;
+    padding: 9px 16px;
+    background: #fff;
+    color: #0B1220;
+    font-weight: 700; font-size: 12px;
+    border-radius: 999px;
+    text-decoration: none;
+    transition: transform 0.15s;
+    white-space: nowrap;
+  }
+  .cta:hover { transform: translateY(-1px); }
+
+  /* Bottom odds slot */
+  .banner-odds {
+    position: absolute;
+    left: 12px; right: 12px; bottom: 12px;
+    z-index: 5;
+    display: flex; gap: 8px;
+  }
+  .banner.has-terms-strip .banner-odds { bottom: 38px; }
+  .odds-btn {
+    flex: 1;
+    background: #fff;
+    color: #0B1220;
+    padding: 8px 12px;
+    border-radius: 8px;
+    display: flex; flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: transform 0.12s, box-shadow 0.12s;
+    text-align: center;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.06);
+  }
+  .odds-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.18); }
+  .odds-btn .odds-label { color: #4B5563; font-size: 11px; line-height: 1.2; }
+  .odds-btn .odds-value { font-weight: 700; font-size: 14px; color: #0B1220; }
+
+  .banner-odds.boosted .odds-btn {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    gap: 12px;
+  }
+  .banner-odds.boosted .odds-label { font-size: 12px; color: #0B1220; font-weight: 600; }
+  .banner-odds.boosted .odds-original {
+    text-decoration: line-through;
+    color: #6B7280;
+    font-size: 12px;
+  }
+  .banner-odds.boosted .odds-boosted {
+    font-weight: 700; font-size: 16px;
+    color: #DC2626;
+    margin-left: 6px;
+  }
+  .banner-odds.boosted .odds-pair { display: flex; align-items: baseline; gap: 4px; }
+
+  /* T&Cs */
+  .terms-inside {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    z-index: 4;
+    padding: 8px 12px;
+    font-size: 10px;
+    line-height: 1.3;
+    color: rgba(255,255,255,0.78);
+    pointer-events: none;
+  }
+  .terms-frosted {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    z-index: 4;
+    padding: 8px 12px;
+    font-size: 10px;
+    line-height: 1.3;
+    color: #fff;
+    background: rgba(0,0,0,0.32);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    border-top: 1px solid rgba(255,255,255,0.12);
+    pointer-events: none;
+  }
+  .terms-outside {
+    font-size: 10px;
+    color: #4B5563;
+    line-height: 1.4;
+    padding: 0 4px;
+  }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+
+  /* ============ PAGE CONTEXT ============ */
+  .page-context {
+    user-select: none;
+    pointer-events: none;
+  }
+  .page-context img { display: block; width: 100%; height: auto; }
+  /* Hide left/right slots by default; only used when has-sides on device-screen */
+  .page-context.left, .page-context.right { display: none; }
+
+  .device-screen.is-sportsbook { background: #F5F6F6 !important; }
+  .device-screen.is-casino { background: #112F3F !important; }
+
+  /* When sidebars are present (desktop with left or right uploaded), switch to grid.
+     Left and right are fixed 320px columns, full height. Top/main/bottom stack in the middle. */
+  .device-screen.has-sides {
+    display: grid;
+    grid-template-columns: 320px minmax(0, 1fr) 320px;
+    grid-template-rows: auto auto auto;
+    grid-template-areas:
+      "left top   right"
+      "left main  right"
+      "left bot   right";
+    align-items: stretch;
+  }
+  /* Padding only on the banner row — top/bottom context touch the sidebars edge-to-edge */
+  .device-screen.has-sides .viewport {
+    padding-left: 24px;
+    padding-right: 24px;
+    box-sizing: border-box;
+  }
+  /* Casino desktop: 24px padding around the banner */
+  .device-frame.is-desktop .device-screen.is-casino .viewport {
+    padding: 24px;
+    box-sizing: border-box;
+  }
+  .device-screen.has-sides .page-context.above { grid-area: top; }
+  .device-screen.has-sides .page-context.below { grid-area: bot; }
+  .device-screen.has-sides .page-context.left,
+  .device-screen.has-sides .page-context.right {
+    display: block;
+    width: 320px;
+    overflow: hidden;
+  }
+  .device-screen.has-sides .page-context.left { grid-area: left; }
+  .device-screen.has-sides .page-context.right { grid-area: right; }
+  .device-screen.has-sides .viewport { grid-area: main; }
+  .device-screen.has-sides .page-context.left img,
+  .device-screen.has-sides .page-context.right img {
+    width: 320px;
+    height: auto;
+    display: block;
+  }
+
+</style>
+</head>
+<body>
+
+<script>
+/* ============================================================
+   PASSWORD GATE — change PASSWORD below before deploying
+============================================================ */
+(() => {
+  const PASSWORD = "#9.1tL>w99m%"; // <-- change this
+  const KEY = "bp-auth";
+  if (sessionStorage.getItem(KEY) === PASSWORD) return;
+  document.documentElement.style.background = "#0E1116";
+  const overlay = document.createElement("div");
+  overlay.style.cssText = "position:fixed;inset:0;z-index:99999;background:#0E1116;color:#E6EDF3;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;font-family:'Inter',-apple-system,sans-serif;";
+  overlay.innerHTML = `
+    <div style="font-size:16px;font-weight:600;letter-spacing:0.02em;">Banner Playground</div>
+    <div style="font-size:13px;color:#8B95A1;">Enter the password to view</div>
+    <input id="__pw" type="password" autofocus
+      style="margin-top:6px;padding:10px 14px;font-size:14px;width:280px;border-radius:8px;border:1px solid #2A323D;background:#1C232C;color:#fff;outline:none;font-family:inherit;" />
+    <button id="__go"
+      style="padding:9px 24px;font-size:13px;font-weight:600;background:#4F7BFF;color:#fff;border:0;border-radius:8px;cursor:pointer;font-family:inherit;">Unlock</button>
+    <div id="__err" style="font-size:12px;color:#EF4444;height:14px;">&nbsp;</div>`;
+  document.body.appendChild(overlay);
+  const check = () => {
+    if (document.getElementById("__pw").value === PASSWORD) {
+      sessionStorage.setItem(KEY, PASSWORD);
+      overlay.remove();
+    } else {
+      document.getElementById("__err").textContent = "Wrong password";
+    }
+  };
+  document.getElementById("__go").onclick = check;
+  document.getElementById("__pw").onkeydown = (e) => { if (e.key === "Enter") check(); };
+})();
+</script>
+
+<div class="app">
+  <button class="show-sidebar-btn" id="btnShowSidebar" title="Show panel">»</button>
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <!-- HEADER (persistent) -->
+    <div class="sidebar-header">
+      <div class="brand-row">
+        <h1>Banner Playground</h1>
+        <div style="display: flex; gap: 6px;">
+          <button class="icon-btn" id="btnSaveDrawer" title="Save &amp; Load">⚙</button>
+          <button class="icon-btn" id="btnHideSidebar" title="Hide panel (full canvas)">«</button>
+        </div>
+      </div>
+      <div class="header-pill-row">
+        <span class="header-pill-label">Device</span>
+        <div class="seg seg-mini" id="devicePreset">
+          <button data-name="mobile">Mobile</button>
+          <button data-name="desktop" class="active">Desktop</button>
+        </div>
+      </div>
+      <div class="header-pill-row">
+        <span class="header-pill-label">Vertical</span>
+        <div class="seg seg-mini" id="verticalPicker">
+          <button data-v="casino">Casino</button>
+          <button data-v="sportsbook" class="active">Sportsbook</button>
+        </div>
+      </div>
+      <div class="save-status mini" id="saveStatus">
+        <span class="dot-status"></span>
+        <span id="saveStatusText">Ready</span>
+      </div>
+    </div>
+
+    <!-- TABS -->
+    <div class="sidebar-tabs">
+      <button class="tab active" data-tab="layout">Layout</button>
+      <button class="tab" data-tab="carousel">Carousel</button>
+      <button class="tab" data-tab="content">Content</button>
+      <button class="tab" data-tab="context">Context</button>
+    </div>
+
+    <!-- TAB PANELS -->
+    <div class="sidebar-body">
+
+      <!-- ====== LAYOUT PANEL ====== -->
+      <div class="tab-panel active" data-panel="layout">
+        <div class="panel-meta">Per-device · <strong id="presetPill">Desktop</strong></div>
+
+        <label class="field">
+          <span>Width <strong id="widthOut">1200px</strong></span>
+          <input type="number" id="widthInput" min="320" max="2400" step="1" value="1200" />
+        </label>
+        <label class="field">
+          <span>Banner height <strong id="heightOut">300px</strong></span>
+          <input type="range" id="f-height" min="180" max="600" step="10" value="300" />
+        </label>
+        <label class="field">
+          <span>Border radius <strong id="radiusOut">12px</strong></span>
+          <input type="range" id="f-radius" min="0" max="32" step="1" value="12" />
+        </label>
+        <label class="field">
+          <span>Gap between banners <strong id="gapOut">12px</strong></span>
+          <input type="range" id="f-gap" min="0" max="40" step="1" value="12" />
+        </label>
+        <label class="field">
+          <span>Peek of next banner <strong id="peekOut">18%</strong></span>
+          <input type="range" id="f-peek" min="0" max="40" step="1" value="18" />
+        </label>
+        <label class="field">
+          <span>Asset width <strong id="assetWidthOut">50%</strong></span>
+          <input type="range" id="f-assetWidth" min="20" max="80" step="1" value="50" />
+          <div class="hint">Width of the right-slot image.</div>
+        </label>
+        <label class="field">
+          <span>Text container width <strong id="contentWidthOut">50%</strong></span>
+          <input type="range" id="f-contentWidth" min="30" max="100" step="1" value="50" />
+        </label>
+
+        <div class="panel-sub-title">Typography</div>
+        <div class="toggle-row">
+          <span>Smart sizing (clamp)</span>
+          <div class="switch on" id="t-smart"></div>
+        </div>
+        <div class="typo-block">
+          <div class="typo-title">Headline</div>
+          <div class="mini-row" id="hl-min-row">
+            <label>Min</label>
+            <input type="range" id="f-hlMin" min="12" max="32" step="1" value="18" />
+            <div class="v"><span id="hlMinOut">18</span>px</div>
+          </div>
+          <div class="mini-row">
+            <label id="hl-max-label">Max</label>
+            <input type="range" id="f-hlMax" min="20" max="72" step="1" value="44" />
+            <div class="v"><span id="hlMaxOut">44</span>px</div>
+          </div>
+        </div>
+        <div class="typo-block">
+          <div class="typo-title">Body</div>
+          <div class="mini-row" id="bd-min-row">
+            <label>Min</label>
+            <input type="range" id="f-bdMin" min="9" max="16" step="1" value="11" />
+            <div class="v"><span id="bdMinOut">11</span>px</div>
+          </div>
+          <div class="mini-row">
+            <label id="bd-max-label">Max</label>
+            <input type="range" id="f-bdMax" min="12" max="24" step="1" value="16" />
+            <div class="v"><span id="bdMaxOut">16</span>px</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====== CAROUSEL PANEL ====== -->
+      <div class="tab-panel" data-panel="carousel">
+        <div class="panel-meta">Shared across all devices</div>
+
+        <label class="field">
+          <span>Total banners</span>
+          <div class="stepper">
+            <button id="dec">−</button>
+            <div class="val" id="countVal">3</div>
+            <button id="inc">+</button>
+          </div>
+        </label>
+        <label class="field">
+          <span>Banners visible at once</span>
+          <div class="stepper">
+            <button id="visDec">−</button>
+            <div class="val" id="visVal">1</div>
+            <button id="visInc">+</button>
+          </div>
+          <div class="hint">Mobile always shows 1 + peek.</div>
+        </label>
+        <label class="field">
+          <span>T&amp;Cs placement</span>
+          <div class="seg" id="termsPlacement">
+            <button data-place="inside" class="active">Inside</button>
+            <button data-place="frosted">Frosted</button>
+            <button data-place="outside">Below</button>
+          </div>
+        </label>
+        <div class="toggle-row">
+          <span>Auto-advance</span>
+          <div class="switch on" id="t-autoplay"></div>
+        </div>
+        <label class="field" id="autoplayField">
+          <span>Interval <strong id="autoplayOut">5.0s</strong></span>
+          <input type="range" id="f-autoplay" min="2" max="12" step="0.5" value="5" />
+        </label>
+      </div>
+
+      <!-- ====== CONTENT PANEL ====== -->
+      <div class="tab-panel" data-panel="content">
+        <div class="panel-meta">Shared content · same across devices</div>
+
+        <div class="banner-tabs" id="bannerTabs"></div>
+
+        <div class="toggle-row">
+          <span>Show badge</span>
+          <div class="switch" id="t-badge"></div>
+        </div>
+        <label class="field" id="badge-field">
+          <span>Badge text <small class="counter" id="c-badge">0 / 20</small></span>
+          <input type="text" id="f-badge" placeholder="VIP exclusive" />
+        </label>
+
+        <label class="field">
+          <span>Headline <small class="counter" id="c-headline">0 / 60</small></span>
+          <input type="text" id="f-headline" />
+        </label>
+
+        <label class="field">
+          <span>Body <small class="counter" id="c-body">0 / 120</small></span>
+          <textarea id="f-body"></textarea>
+        </label>
+
+        <label class="field">
+          <span>Bottom slot</span>
+          <div class="seg" id="bottomType">
+            <button data-bt="nothing">None</button>
+            <button data-bt="cta" class="active">CTA</button>
+            <button data-bt="odds">Odds</button>
+          </div>
+        </label>
+
+        <div id="cta-config">
+          <label class="field">
+            <span>CTA label <small class="counter" id="c-cta">0 / 20</small></span>
+            <input type="text" id="f-cta" placeholder="Play now" />
+          </label>
+        </div>
+
+        <div id="odds-config" style="display:none;">
+          <label class="field">
+            <span>Odds variant</span>
+            <div class="seg" id="oddsMode">
+              <button data-om="three-way" class="active">Three-way</button>
+              <button data-om="boosted">Boosted</button>
+            </div>
+          </label>
+
+          <div id="threeway-config" class="config-block">
+            <div class="config-block-title">Three options</div>
+            <div class="odds-row" style="margin-bottom: 4px;">
+              <span style="font-size:11px;color:var(--ink-3)">Label</span>
+              <span style="font-size:11px;color:var(--ink-3)">Odds</span>
+            </div>
+            <div class="odds-row">
+              <input type="text" id="tw0l" placeholder="Home" />
+              <input type="text" id="tw0o" inputmode="decimal" placeholder="2.10" />
+            </div>
+            <div class="odds-row">
+              <input type="text" id="tw1l" placeholder="Draw" />
+              <input type="text" id="tw1o" inputmode="decimal" placeholder="3.40" />
+            </div>
+            <div class="odds-row">
+              <input type="text" id="tw2l" placeholder="Away" />
+              <input type="text" id="tw2o" inputmode="decimal" placeholder="3.20" />
+            </div>
+          </div>
+
+          <div id="boosted-config" class="config-block" style="display:none;">
+            <div class="config-block-title">Boosted bet</div>
+            <label class="field">
+              <span>Label</span>
+              <input type="text" id="bs-label" placeholder="Manchester to win" />
+            </label>
+            <div class="row">
+              <label class="field">
+                <span>Original</span>
+                <input type="text" id="bs-original" inputmode="decimal" placeholder="2.50" />
+              </label>
+              <label class="field">
+                <span>Boosted</span>
+                <input type="text" id="bs-boosted" inputmode="decimal" placeholder="3.50" />
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <label class="field">
+          <span>Terms &amp; conditions</span>
+          <textarea id="f-terms" placeholder="18+. T&Cs apply."></textarea>
+        </label>
+
+        <div class="panel-sub-title">Background</div>
+        <label class="field">
+          <span>Style</span>
+          <div class="seg" id="bgStyle">
+            <button data-bg="solid">Solid</button>
+            <button data-bg="gradient" class="active">Gradient</button>
+          </div>
+        </label>
+        <div class="row">
+          <label class="field">
+            <span>Color 1</span>
+            <input type="color" id="f-bg1" value="#1a1a2e" />
+          </label>
+          <label class="field" id="bg2Wrap">
+            <span>Color 2</span>
+            <input type="color" id="f-bg2" value="#16213e" />
+          </label>
+        </div>
+        <span class="hint" style="display:block; margin-bottom:6px;">Quick swatches</span>
+        <div class="swatch-row" id="swatches"></div>
+
+        <div class="panel-sub-title">Asset image</div>
+        <label class="upload" id="uploadLabel">
+          <input type="file" id="f-asset" accept="image/*" />
+          <span>Click to upload (PNG with transparency works best)</span>
+        </label>
+        <div id="assetPreview" style="display:none;" class="asset-preview">
+          <img id="assetThumb" alt="" />
+          <div class="meta" id="assetName"></div>
+          <button id="assetClear" title="Remove">×</button>
+        </div>
+        <label class="field" style="margin-top:10px;">
+          <span>Placement</span>
+          <div class="seg" id="assetPlacement">
+            <button data-place="right" class="active">Right slot</button>
+            <button data-place="bleed">Full-bleed</button>
+          </div>
+        </label>
+
+        <div id="asset-editor" class="config-block" style="display:none; margin-top: 8px;">
+          <div class="config-block-title">Image editor</div>
+          <label class="field">
+            <span>Fit mode</span>
+            <div class="seg" id="assetFit">
+              <button data-fit="contain" class="active">Contain</button>
+              <button data-fit="cover">Cover</button>
+            </div>
+          </label>
+          <label class="field">
+            <span>Scale (zoom) <strong id="scaleOut">100%</strong></span>
+            <input type="range" id="f-scale" min="100" max="300" step="5" value="100" />
+          </label>
+          <label class="field">
+            <span>Horizontal focus <strong id="posXOut">50%</strong></span>
+            <input type="range" id="f-posX" min="0" max="100" step="1" value="50" />
+          </label>
+          <label class="field">
+            <span>Vertical focus <strong id="posYOut">50%</strong></span>
+            <input type="range" id="f-posY" min="0" max="100" step="1" value="50" />
+          </label>
+          <div class="btn-row">
+            <button class="btn primary" id="fitHeight">Fit to height</button>
+            <button class="btn" id="resetAsset">Reset</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====== CONTEXT PANEL ====== -->
+      <div class="tab-panel" data-panel="context">
+        <div class="panel-meta">Global · current slot: <strong id="ctxMeta">Desktop · Sportsbook</strong></div>
+        <div class="hint" style="margin-bottom: 14px;">
+          Upload screenshots of your real page. The <strong>top</strong> image shows above the banner; the <strong>bottom</strong> image shows below. Crop them so the join feels natural.
+        </div>
+
+        <div class="ss-slot">
+          <div class="ss-slot-label">Top screenshot</div>
+          <label class="upload" id="ssTopUploadLabel">
+            <input type="file" id="f-ssTop" accept="image/*" />
+            <span>Click to upload top context</span>
+          </label>
+          <div id="ssTopPreview" style="display:none;" class="asset-preview">
+            <img id="ssTopThumb" alt="" />
+            <div class="meta" id="ssTopName"></div>
+            <button id="ssTopClear" title="Remove">×</button>
+          </div>
+        </div>
+
+        <div class="ss-slot">
+          <div class="ss-slot-label">Bottom screenshot</div>
+          <label class="upload" id="ssBottomUploadLabel">
+            <input type="file" id="f-ssBottom" accept="image/*" />
+            <span>Click to upload bottom context</span>
+          </label>
+          <div id="ssBottomPreview" style="display:none;" class="asset-preview">
+            <img id="ssBottomThumb" alt="" />
+            <div class="meta" id="ssBottomName"></div>
+            <button id="ssBottomClear" title="Remove">×</button>
+          </div>
+        </div>
+
+        <!-- Desktop-only: Left + Right sidebars -->
+        <div id="ssSidesGroup" style="display:none;">
+          <div class="ss-slot">
+            <div class="ss-slot-label">Left sidebar (desktop only)</div>
+            <label class="upload" id="ssLeftUploadLabel">
+              <input type="file" id="f-ssLeft" accept="image/*" />
+              <span>Click to upload left sidebar</span>
+            </label>
+            <div id="ssLeftPreview" style="display:none;" class="asset-preview">
+              <img id="ssLeftThumb" alt="" />
+              <div class="meta" id="ssLeftName"></div>
+              <button id="ssLeftClear" title="Remove">×</button>
+            </div>
+          </div>
+
+          <div class="ss-slot">
+            <div class="ss-slot-label">Right sidebar (desktop only)</div>
+            <label class="upload" id="ssRightUploadLabel">
+              <input type="file" id="f-ssRight" accept="image/*" />
+              <span>Click to upload right sidebar</span>
+            </label>
+            <div id="ssRightPreview" style="display:none;" class="asset-preview">
+              <img id="ssRightThumb" alt="" />
+              <div class="meta" id="ssRightName"></div>
+              <button id="ssRightClear" title="Remove">×</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="hint" style="margin-top: 14px;">
+          Each slot is stored per (device × vertical). Switch device or vertical in the header above to upload for another context.
+        </div>
+      </div>
+
+    </div>
+  </aside>
+
+  <!-- ============ SAVE & LOAD DRAWER ============ -->
+  <div class="drawer-backdrop hidden" id="drawerBackdrop"></div>
+  <aside class="save-drawer hidden" id="saveDrawer">
+    <div class="drawer-header">
+      <h2>Save &amp; Load</h2>
+      <button class="icon-btn" id="closeSaveDrawer" title="Close">×</button>
+    </div>
+    <div class="drawer-body">
+      <p class="hint">Includes every setting + all uploaded images (banner assets and context screenshots).</p>
+      <div class="btn-row three" style="margin-top: 8px;">
+        <button class="btn primary" id="btnExport">Export</button>
+        <button class="btn" id="btnImport">Import</button>
+        <button class="btn danger" id="btnReset">Reset</button>
+      </div>
+      <input type="file" id="f-import" accept="application/json" style="display:none" />
+      <div class="toggle-row" style="margin-top: 14px;">
+        <span>Auto-save to browser</span>
+        <div class="switch on" id="t-autosave"></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============ CANVAS ============ -->
+  <main class="canvas">
+    <div class="topbar">
+      <div class="title">Live preview</div>
+      <div class="meta" id="metaInfo">1200px · desktop · 3 banners</div>
+    </div>
+
+    <div class="viewport-wrap">
+      <div class="device-frame" id="deviceFrame">
+        <div class="browser-chrome"><span></span><span></span><span></span></div>
+        <div class="device-screen" id="deviceScreen">
+          <div class="page-context above" id="ctxAbove"></div>
+          <div class="page-context left" id="ctxLeft"></div>
+          <div class="viewport" id="viewport">
+            <div class="carousel" id="carousel"></div>
+            <div class="pagination-wrap" id="paginationWrap">
+              <div class="pagination" id="pagination"></div>
+              <div class="progress hidden" id="progress"><div class="progress-bar" id="progressBar"></div></div>
+            </div>
+          </div>
+          <div class="page-context right" id="ctxRight"></div>
+          <div class="page-context below" id="ctxBelow"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+/* ============================================================
+   STATE
+============================================================ */
+const mkAsset = (file) => ({
+  url: `assets/${file}`,
+  name: file,
+  fit: "contain",
+  scale: 100,
+  posX: 50,
+  posY: 50,
+});
+
+const presets = [
+  { headline: "200 Free Spins on your first deposit",
+    body: "Spin to win on selected slots. New players only.",
+    badge: "Welcome offer", showBadge: true,
+    bottomType: "cta",
+    cta: "Claim now",
+    terms: "18+. T&Cs apply. Wagering 35x. Begambleaware.org",
+    bg: { style: "gradient", c1: "#7C3AED", c2: "#DB2777" },
+    defaultAsset: mkAsset("tiger.png") },
+  { headline: "Barcelona vs Liverpool",
+    body: "UEFA Champions League · Today 18:45",
+    badge: "", showBadge: false,
+    bottomType: "odds",
+    cta: "",
+    terms: "18+. Begambleaware.org",
+    bg: { style: "gradient", c1: "#1E293B", c2: "#0F172A" },
+    defaultAsset: mkAsset("soccer.png") },
+  { headline: "£5,000 Leaderboard",
+    body: "Climb your way to one of 150 prizes.",
+    badge: "New", showBadge: true,
+    bottomType: "cta",
+    cta: "Enter now",
+    terms: "18+. Opt in via game. Leaderboard entry based on highest single win multiplier x 1000 on qualifying slots.",
+    bg: { style: "gradient", c1: "#14B8A6", c2: "#1E3A8A" },
+    defaultAsset: mkAsset("tennis.png") },
+  { headline: "Daily Drops & Wins — €2M in prizes",
+    body: "Real money prizes dropped on selected slots every day.",
+    badge: "Limited", showBadge: true,
+    bottomType: "cta",
+    cta: "Play now",
+    terms: "18+. T&Cs apply. Begambleaware.org",
+    bg: { style: "gradient", c1: "#1E40AF", c2: "#0EA5E9" } },
+  { headline: "Refer a friend — get £25 each",
+    body: "Share your code and you both get a free bet when they join.",
+    badge: "Refer", showBadge: false,
+    bottomType: "cta",
+    cta: "Get code",
+    terms: "18+. T&Cs apply. Min deposit £10. Begambleaware.org",
+    bg: { style: "gradient", c1: "#111827", c2: "#374151" } },
+];
+
+const swatchPresets = [
+  ["#1a1a2e", "#16213e"], ["#7C3AED", "#DB2777"],
+  ["#0F766E", "#1E3A8A"], ["#14B8A6", "#1E3A8A"],
+  ["#1E40AF", "#0EA5E9"], ["#111827", "#374151"],
+  ["#DC2626", "#7F1D1D"], ["#059669", "#064E3B"],
+  ["#9333EA", "#4C1D95"], ["#F59E0B", "#92400E"],
+  ["#0B1220", "#1F2937"], ["#FF6B6B", "#FFD93D"],
+];
+
+const LIMITS = { headline: 60, body: 120, badge: 20, cta: 20 };
+
+// Per-device presets — each owns its own LAYOUT + TYPOGRAPHY settings
+const defaultPresetData = {
+  mobile:  { width: 375,  height: 220, radius: 12, gap: 8,  peek: 18, assetWidth: 50, contentWidth: 60, smartSize: true, hlMin: 14, hlMax: 26, bdMin: 11, bdMax: 13 },
+  desktop: { width: 1200, height: 300, radius: 12, gap: 12, peek: 18, assetWidth: 50, contentWidth: 50, smartSize: true, hlMin: 18, hlMax: 44, bdMin: 11, bdMax: 16 },
+};
+
+const state = {
+  activePreset: "desktop",
+  vertical: "sportsbook", // 'casino' | 'sportsbook' — GLOBAL
+  presetData: JSON.parse(JSON.stringify(defaultPresetData)),
+  // Context screenshots — mobile gets top/bottom; desktop also gets left/right
+  screenshots: {
+    mobile:  {
+      casino:     { top: null, bottom: null },
+      sportsbook: { top: null, bottom: null },
+    },
+    desktop: {
+      casino:     { top: null, bottom: null, left: null, right: null },
+      sportsbook: { top: null, bottom: null, left: null, right: null },
+    },
+  },
+  activeTab: "layout", // current sidebar tab
+  // SHARED carousel settings (apply across all device presets)
+  visible: 1,
+  termsPlacement: "inside",
+  autoplay: true,
+  autoplayMs: 5000,
+  activeIdx: 0,
+  current: 0,
+  banners: presets.slice(0, 3).map(b => ({
+    ...b,
+    asset: b.defaultAsset ? { ...b.defaultAsset } : null,
+    assetPlacement: "right",
+    oddsMode: "three-way",
+    oddsThreeWay: [
+      { label: "Barcelona", odds: "3.25" },
+      { label: "Draw",      odds: "1.92" },
+      { label: "Liverpool", odds: "2.35" },
+    ],
+    oddsBoosted: { label: "Manchester to win", original: "2.50", boosted: "3.50" },
+  })),
+};
+
+// active preset shortcut
+const cfg = () => state.presetData[state.activePreset];
+
+/* ============================================================
+   ELEMENTS
+============================================================ */
+const $ = (id) => document.getElementById(id);
+const carouselEl = $("carousel");
+const paginationEl = $("pagination");
+const paginationWrapEl = $("paginationWrap");
+const progressEl = $("progress");
+const progressBarEl = $("progressBar");
+const viewportEl = $("viewport");
+const widthInput = $("widthInput");
+const metaInfo = $("metaInfo");
+const tabsEl = $("bannerTabs");
+const swatchesEl = $("swatches");
+
+/* ============================================================
+   HELPERS
+============================================================ */
+const isMobile = () => cfg().width < 1024;
+const effectiveVisible = () => isMobile() ? 1 : Math.min(state.visible, state.banners.length);
+const peekFraction = () => state.banners.length > effectiveVisible() ? cfg().peek / 100 : 0;
+
+function maxCurrent() {
+  return Math.max(0, state.banners.length - effectiveVisible());
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
+}
+
+function bgCss(b) {
+  const { style, c1, c2 } = b.bg;
+  if (style === "solid") return c1;
+  return `linear-gradient(135deg, ${c1} 0%, ${c2} 100%)`;
+}
+
+function slotsShown() { return effectiveVisible() + peekFraction(); }
+function slideWidthCss() {
+  return `calc((100% - ${(slotsShown() - 1) * cfg().gap}px) / ${slotsShown()})`;
+}
+function trackTransform() {
+  return `translateX(calc(-${state.current} * (${slideWidthCss()} + ${cfg().gap}px)))`;
+}
+
+const PRESET_LABEL = { mobile: "Mobile", desktop: "Desktop" };
+
+/* ============================================================
+   RENDER — sidebar
+============================================================ */
+function renderTabs() {
+  tabsEl.innerHTML = "";
+  state.banners.forEach((_, i) => {
+    const t = document.createElement("button");
+    t.className = "banner-tab" + (i === state.activeIdx ? " active" : "");
+    t.textContent = `Banner ${i + 1}`;
+    t.onclick = () => { state.activeIdx = i; renderTabs(); renderEditor(); };
+    tabsEl.appendChild(t);
+  });
+}
+
+function setCounter(id, value, max) {
+  const el = $(id);
+  if (!el) return;
+  const len = (value || "").length;
+  el.textContent = `${len} / ${max}`;
+  el.classList.toggle("over", len > max);
+  el.classList.toggle("way-over", len > max * 1.5);
+}
+
+function applyTypography() {
+  const c = cfg();
+  if (c.smartSize) {
+    viewportEl.style.setProperty("--headline-size", `clamp(${c.hlMin}px, 4.2cqw, ${c.hlMax}px)`);
+    viewportEl.style.setProperty("--body-size", `clamp(${c.bdMin}px, 1.6cqw, ${c.bdMax}px)`);
+  } else {
+    viewportEl.style.setProperty("--headline-size", `${c.hlMax}px`);
+    viewportEl.style.setProperty("--body-size", `${c.bdMax}px`);
+  }
+}
+
+function renderEditor() {
+  const b = state.banners[state.activeIdx];
+  const c = cfg();
+
+  // Preset pill
+  $("presetPill").textContent = PRESET_LABEL[state.activePreset];
+
+  // Preset highlight
+  document.querySelectorAll("#devicePreset button").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.name === state.activePreset);
+  });
+  // Vertical highlight
+  document.querySelectorAll("#verticalPicker button").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.v === state.vertical);
+  });
+
+  // Banner content fields
+  $("f-badge").value = b.badge || "";
+  $("f-headline").value = b.headline || "";
+  $("f-body").value = b.body || "";
+  $("f-cta").value = b.cta || "";
+  $("f-terms").value = b.terms || "";
+  $("f-bg1").value = b.bg.c1;
+  $("f-bg2").value = b.bg.c2;
+
+  // Counters
+  setCounter("c-badge", b.badge, LIMITS.badge);
+  setCounter("c-headline", b.headline, LIMITS.headline);
+  setCounter("c-body", b.body, LIMITS.body);
+  setCounter("c-cta", b.cta, LIMITS.cta);
+
+  // Toggles
+  $("t-badge").classList.toggle("on", b.showBadge);
+  $("badge-field").style.display = b.showBadge ? "block" : "none";
+
+  // Bottom type
+  document.querySelectorAll("#bottomType button").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.bt === b.bottomType);
+  });
+  $("cta-config").style.display = b.bottomType === "cta" ? "block" : "none";
+  $("odds-config").style.display = b.bottomType === "odds" ? "block" : "none";
+
+  // Odds mode
+  document.querySelectorAll("#oddsMode button").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.om === b.oddsMode);
+  });
+  $("threeway-config").style.display = b.oddsMode === "three-way" ? "block" : "none";
+  $("boosted-config").style.display = b.oddsMode === "boosted" ? "block" : "none";
+
+  // Three-way fields
+  for (let i = 0; i < 3; i++) {
+    $("tw" + i + "l").value = b.oddsThreeWay[i].label;
+    $("tw" + i + "o").value = b.oddsThreeWay[i].odds;
+  }
+  $("bs-label").value = b.oddsBoosted.label;
+  $("bs-original").value = b.oddsBoosted.original;
+  $("bs-boosted").value = b.oddsBoosted.boosted;
+
+  // BG
+  document.querySelectorAll("#bgStyle button").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.bg === b.bg.style);
+  });
+  $("bg2Wrap").style.display = b.bg.style === "solid" ? "none" : "block";
+
+  // Asset
+  if (b.asset) {
+    $("assetPreview").style.display = "flex";
+    $("assetThumb").src = b.asset.url;
+    $("assetName").textContent = b.asset.name;
+    $("uploadLabel").style.display = "none";
+    $("asset-editor").style.display = "block";
+    // populate image editor controls
+    const fit = b.asset.fit || "contain";
+    const scale = b.asset.scale ?? 100;
+    const posX = b.asset.posX ?? 50;
+    const posY = b.asset.posY ?? 50;
+    document.querySelectorAll("#assetFit button").forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.fit === fit);
+    });
+    $("f-scale").value = scale; $("scaleOut").textContent = scale + "%";
+    $("f-posX").value = posX; $("posXOut").textContent = posX + "%";
+    $("f-posY").value = posY; $("posYOut").textContent = posY + "%";
+  } else {
+    $("assetPreview").style.display = "none";
+    $("uploadLabel").style.display = "block";
+    $("asset-editor").style.display = "none";
+  }
+  document.querySelectorAll("#assetPlacement button").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.place === b.assetPlacement);
+  });
+
+  // Per-device sliders / values
+  $("widthOut").textContent = c.width + "px";
+  widthInput.value = c.width;
+  $("heightOut").textContent = c.height + "px"; $("f-height").value = c.height;
+  $("radiusOut").textContent = c.radius + "px"; $("f-radius").value = c.radius;
+  $("gapOut").textContent = c.gap + "px"; $("f-gap").value = c.gap;
+  $("peekOut").textContent = c.peek + "%"; $("f-peek").value = c.peek;
+  $("assetWidthOut").textContent = c.assetWidth + "%"; $("f-assetWidth").value = c.assetWidth;
+  $("contentWidthOut").textContent = c.contentWidth + "%"; $("f-contentWidth").value = c.contentWidth;
+
+  $("visVal").textContent = state.visible;
+  $("visDec").disabled = state.visible <= 1;
+  $("visInc").disabled = state.visible >= 3 || state.visible >= state.banners.length;
+  $("dec").disabled = state.banners.length <= 1;
+  $("inc").disabled = state.banners.length >= 8;
+  $("countVal").textContent = state.banners.length;
+
+  document.querySelectorAll("#termsPlacement button").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.place === state.termsPlacement);
+  });
+
+  $("autoplayOut").textContent = (state.autoplayMs / 1000).toFixed(1) + "s";
+  $("f-autoplay").value = state.autoplayMs / 1000;
+  $("t-autoplay").classList.toggle("on", state.autoplay);
+  $("autoplayField").style.display = state.autoplay ? "block" : "none";
+
+  // Typography
+  $("t-smart").classList.toggle("on", c.smartSize);
+  $("f-hlMin").value = c.hlMin; $("hlMinOut").textContent = c.hlMin;
+  $("f-hlMax").value = c.hlMax; $("hlMaxOut").textContent = c.hlMax;
+  $("f-bdMin").value = c.bdMin; $("bdMinOut").textContent = c.bdMin;
+  $("f-bdMax").value = c.bdMax; $("bdMaxOut").textContent = c.bdMax;
+  $("hl-min-row").style.display = c.smartSize ? "grid" : "none";
+  $("bd-min-row").style.display = c.smartSize ? "grid" : "none";
+  $("hl-max-label").textContent = c.smartSize ? "Max" : "Size";
+  $("bd-max-label").textContent = c.smartSize ? "Max" : "Size";
+
+  applyTypography();
+}
+
+function renderSwatches() {
+  swatchesEl.innerHTML = "";
+  swatchPresets.forEach(([c1, c2]) => {
+    const s = document.createElement("div");
+    s.className = "swatch";
+    s.style.background = `linear-gradient(135deg, ${c1}, ${c2})`;
+    s.title = `${c1} → ${c2}`;
+    s.onclick = () => {
+      const b = state.banners[state.activeIdx];
+      b.bg.c1 = c1; b.bg.c2 = c2;
+      if (b.bg.style === "solid") b.bg.style = "gradient";
+      renderEditor();
+      renderCarousel();
+    };
+    swatchesEl.appendChild(s);
+  });
+}
+
+/* ============================================================
+   RENDER — banner card
+============================================================ */
+function renderOdds(b) {
+  if (b.bottomType !== "odds") return "";
+  if (b.oddsMode === "three-way") {
+    const opts = b.oddsThreeWay.map(o => `
+      <div class="odds-btn">
+        <div class="odds-label">${escapeHtml(o.label)}</div>
+        <div class="odds-value">${escapeHtml(o.odds)}</div>
+      </div>
+    `).join("");
+    return `<div class="banner-odds three-way">${opts}</div>`;
+  } else {
+    const o = b.oddsBoosted;
+    return `
+      <div class="banner-odds boosted">
+        <div class="odds-btn">
+          <div class="odds-label">${escapeHtml(o.label)}</div>
+          <div class="odds-pair">
+            <span class="odds-original">${escapeHtml(o.original)}</span>
+            <span class="odds-boosted">${escapeHtml(o.boosted)}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+}
+
+function renderBanner(b) {
+  const isBleed = b.asset && b.assetPlacement === "bleed";
+  const hasAsset = !!b.asset;
+  const aw = cfg().assetWidth;
+  // Content width: always user-controlled, applies regardless of asset state.
+  const contentW = cfg().contentWidth;
+  const hasOdds = b.bottomType === "odds";
+  const termsP = state.termsPlacement;
+  const hasTermsStrip = b.terms && (termsP === "inside" || termsP === "frosted");
+
+  const classes = [
+    "banner",
+    hasAsset ? "has-asset" : "",
+    hasOdds ? "has-bottom-odds" : "",
+    hasTermsStrip ? "has-terms-strip" : "",
+  ].filter(Boolean).join(" ");
+
+  // Asset editor vars
+  const assetVars = hasAsset ? `
+    --asset-fit: ${b.asset.fit || 'contain'};
+    --asset-px: ${b.asset.posX ?? 50}%;
+    --asset-py: ${b.asset.posY ?? 50}%;
+    --asset-scale: ${(b.asset.scale ?? 100) / 100};
+  ` : '';
+
+  return `
+    <div class="${classes}" style="--asset-w: ${aw}%; --content-w: ${contentW}%; ${assetVars}">
+      <div class="banner-bg" style="background: ${bgCss(b)}"></div>
+      ${hasAsset ? `
+        <div class="banner-asset ${isBleed ? 'bleed' : ''}">
+          <img src="${b.asset.url}" alt="" />
+        </div>
+      ` : ""}
+      <div class="content-slot">
+        ${b.showBadge && b.badge ? `<span class="badge">${escapeHtml(b.badge)}</span>` : ""}
+        <h2 class="headline">${escapeHtml(b.headline || "")}</h2>
+        <p class="body">${escapeHtml(b.body || "")}</p>
+        ${b.bottomType === "cta" && b.cta ? `<span class="cta">${escapeHtml(b.cta)} →</span>` : ""}
+      </div>
+      ${renderOdds(b)}
+      ${termsP === "inside" && b.terms
+        ? `<div class="terms-inside">${escapeHtml(b.terms)}</div>` : ""}
+      ${termsP === "frosted" && b.terms
+        ? `<div class="terms-frosted">${escapeHtml(b.terms)}</div>` : ""}
+    </div>
+  `;
+}
+
+/* ============================================================
+   RENDER — carousel layout
+============================================================ */
+function renderCarousel() {
+  const c = cfg();
+  viewportEl.classList.toggle("is-mobile", isMobile());
+  viewportEl.style.setProperty("--gap", c.gap + "px");
+  viewportEl.style.setProperty("--radius", c.radius + "px");
+  viewportEl.style.setProperty("--banner-h", c.height + "px");
+  viewportEl.style.setProperty("--auto-ms", state.autoplayMs + "ms");
+
+  // Device frame: width drives the screen, chrome style based on preset
+  const frame = $("deviceFrame");
+  frame.style.setProperty("--device-w", c.width + "px");
+  frame.classList.remove("is-phone", "is-tablet", "is-desktop");
+  if (state.activePreset === "mobile") frame.classList.add("is-phone");
+  else frame.classList.add("is-desktop"); // desktop
+
+  // Vertical-aware screen bg
+  const screen = $("deviceScreen");
+  screen.classList.remove("is-casino", "is-sportsbook");
+  screen.classList.add("is-" + state.vertical);
+
+  // Page context mockups
+  renderPageContext();
+
+  state.current = Math.min(Math.max(0, state.current), maxCurrent());
+
+  const total = state.banners.length;
+  const v = effectiveVisible();
+  const showArrows = total > v && !isMobile();
+
+  const slidesHtml = state.banners.map((b, i) => `
+    <div class="slide" data-i="${i}" style="width: ${slideWidthCss()}">
+      ${renderBanner(b)}
+      ${state.termsPlacement === "outside" && b.terms
+        ? `<div class="terms-outside">${escapeHtml(b.terms)}</div>` : ""}
+    </div>
+  `).join("");
+
+  carouselEl.innerHTML = `
+    <div class="track-clip">
+      <div class="track" id="track" style="transform: ${trackTransform()}; gap: ${c.gap}px">
+        ${slidesHtml}
+      </div>
+    </div>
+    ${showArrows ? `
+      <button class="arrow prev" id="prev" ${state.current === 0 ? "disabled" : ""}>‹</button>
+      <button class="arrow next" id="next" ${state.current >= maxCurrent() ? "disabled" : ""}>›</button>
+    ` : ""}
+  `;
+
+  const stops = maxCurrent() + 1;
+  if (stops > 1) {
+    paginationEl.innerHTML = Array.from({ length: stops }, (_, i) =>
+      `<button class="dot ${i === state.current ? "active" : ""}" data-i="${i}"></button>`
+    ).join("");
+    paginationWrapEl.style.display = "flex";
+  } else {
+    paginationEl.innerHTML = "";
+    paginationWrapEl.style.display = "none";
+  }
+
+  if (showArrows) {
+    $("prev").onclick = () => { goTo(state.current - 1); resetAutoplay(true); };
+    $("next").onclick = () => { goTo(state.current + 1); resetAutoplay(true); };
+  }
+  paginationEl.querySelectorAll(".dot").forEach(d => {
+    d.onclick = () => { goTo(parseInt(d.dataset.i, 10)); resetAutoplay(true); };
+  });
+
+  attachSwipe();
+  updateMeta();
+  resetAutoplay();
+}
+
+function goTo(i, smooth = true) {
+  state.current = Math.max(0, Math.min(maxCurrent(), i));
+  const track = $("track");
+  if (!track) return;
+  if (!smooth) track.style.transition = "none";
+  track.style.transform = trackTransform();
+  if (!smooth) requestAnimationFrame(() => { track.style.transition = ""; });
+  const prev = $("prev"), next = $("next");
+  if (prev) prev.disabled = state.current === 0;
+  if (next) next.disabled = state.current >= maxCurrent();
+  paginationEl.querySelectorAll(".dot").forEach((d, idx) => {
+    d.classList.toggle("active", idx === state.current);
+  });
+}
+
+/* ============================================================
+   PAGE CONTEXT — uploaded screenshots above & below the banner
+============================================================ */
+function currentScreenshotSlot() {
+  return state.screenshots[state.activePreset][state.vertical];
+}
+
+function renderPageContext() {
+  const slot = currentScreenshotSlot();
+  const above = $("ctxAbove");
+  const below = $("ctxBelow");
+  const left = $("ctxLeft");
+  const right = $("ctxRight");
+
+  above.innerHTML = slot.top ? `<img src="${slot.top.url}" alt="" />` : "";
+  below.innerHTML = slot.bottom ? `<img src="${slot.bottom.url}" alt="" />` : "";
+  left.innerHTML  = slot.left  ? `<img src="${slot.left.url}" alt="" />` : "";
+  right.innerHTML = slot.right ? `<img src="${slot.right.url}" alt="" />` : "";
+
+  // Switch device-screen to grid layout only when sidebars are present (desktop only)
+  const hasSides = state.activePreset === "desktop" && (slot.left || slot.right);
+  $("deviceScreen").classList.toggle("has-sides", !!hasSides);
+
+  // Show/hide left & right upload slots in Context tab — desktop only
+  $("ssSidesGroup").style.display = state.activePreset === "desktop" ? "block" : "none";
+
+  // Update Context-tab meta label
+  const metaEl = $("ctxMeta");
+  if (metaEl) {
+    metaEl.textContent = `${PRESET_LABEL[state.activePreset]} · ${state.vertical === "casino" ? "Casino" : "Sportsbook"}`;
+  }
+
+  // Update upload UI state for each slot (only those that apply to current device)
+  renderScreenshotSlot("top", slot.top);
+  renderScreenshotSlot("bottom", slot.bottom);
+  if (state.activePreset === "desktop") {
+    renderScreenshotSlot("left", slot.left);
+    renderScreenshotSlot("right", slot.right);
+  }
+}
+
+function renderScreenshotSlot(kind, data) {
+  const cap = kind.charAt(0).toUpperCase() + kind.slice(1);
+  const label = $("ss" + cap + "UploadLabel");
+  const prev = $("ss" + cap + "Preview");
+  const thumb = $("ss" + cap + "Thumb");
+  const name = $("ss" + cap + "Name");
+  if (!label || !prev) return;
+  if (data) {
+    label.style.display = "none";
+    prev.style.display = "flex";
+    thumb.src = data.url;
+    name.textContent = data.name;
+  } else {
+    label.style.display = "block";
+    prev.style.display = "none";
+  }
+}
+
+function attachSwipe() {
+  const track = $("track");
+  if (!track) return;
+  let startX = null;
+  track.addEventListener("touchstart", (e) => { startX = e.touches[0].clientX; }, { passive: true });
+  track.addEventListener("touchend", (e) => {
+    if (startX === null) return;
+    const dx = e.changedTouches[0].clientX - startX;
+    if (Math.abs(dx) > 40) { goTo(state.current + (dx < 0 ? 1 : -1)); resetAutoplay(true); }
+    startX = null;
+  });
+}
+
+function updateMeta() {
+  const c = cfg();
+  metaInfo.textContent = `${PRESET_LABEL[state.activePreset]} · ${c.width}px · ${state.banners.length} banner${state.banners.length === 1 ? "" : "s"} · ${effectiveVisible()} visible · ${c.height}px tall`;
+}
+
+/* ============================================================
+   AUTOPLAY
+============================================================ */
+let autoTimer = null;
+const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function resetAutoplay() {
+  clearTimeout(autoTimer);
+  if (progressBarEl) {
+    progressBarEl.classList.remove("run");
+    progressBarEl.style.width = "0%";
+  }
+  const eligible = state.autoplay && !reducedMotion && state.banners.length > effectiveVisible();
+  progressEl.classList.toggle("hidden", !eligible);
+  if (!eligible) return;
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => { progressBarEl.classList.add("run"); });
+  });
+  autoTimer = setTimeout(() => {
+    if (!state.autoplay) return;
+    const next = state.current >= maxCurrent() ? 0 : state.current + 1;
+    goTo(next);
+    resetAutoplay();
+  }, state.autoplayMs);
+}
+
+function pauseAutoplay() {
+  clearTimeout(autoTimer);
+  autoTimer = null;
+  if (progressBarEl) {
+    const w = getComputedStyle(progressBarEl).width;
+    progressBarEl.classList.remove("run");
+    progressBarEl.style.width = w;
+  }
+}
+
+viewportEl.addEventListener("mouseenter", pauseAutoplay);
+viewportEl.addEventListener("mouseleave", () => resetAutoplay());
+
+/* ============================================================
+   EVENTS
+============================================================ */
+// Tabs
+function activateTab(name) {
+  state.activeTab = name;
+  document.querySelectorAll(".sidebar-tabs .tab").forEach(t => {
+    t.classList.toggle("active", t.dataset.tab === name);
+  });
+  document.querySelectorAll(".tab-panel").forEach(p => {
+    p.classList.toggle("active", p.dataset.panel === name);
+  });
+}
+document.querySelectorAll(".sidebar-tabs .tab").forEach(t => {
+  t.onclick = () => activateTab(t.dataset.tab);
+});
+
+// Sidebar collapse/show
+const appEl = document.querySelector(".app");
+$("btnHideSidebar").onclick = () => appEl.classList.add("sidebar-hidden");
+$("btnShowSidebar").onclick = () => appEl.classList.remove("sidebar-hidden");
+
+// Save & Load drawer
+function openDrawer() {
+  $("saveDrawer").classList.remove("hidden");
+  $("drawerBackdrop").classList.remove("hidden");
+}
+function closeDrawer() {
+  $("saveDrawer").classList.add("hidden");
+  $("drawerBackdrop").classList.add("hidden");
+}
+$("btnSaveDrawer").onclick = openDrawer;
+$("closeSaveDrawer").onclick = closeDrawer;
+$("drawerBackdrop").onclick = closeDrawer;
+
+// Screenshot uploads (per preset + vertical)
+function bindScreenshotSlot(kind) {
+  const cap = kind.charAt(0).toUpperCase() + kind.slice(1);
+  $("f-ss" + cap).onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const slot = currentScreenshotSlot();
+      slot[kind] = { url: ev.target.result, name: file.name };
+      renderPageContext();
+      renderCarousel();
+    };
+    reader.readAsDataURL(file);
+  };
+  $("ss" + cap + "Clear").onclick = () => {
+    const slot = currentScreenshotSlot();
+    slot[kind] = null;
+    $("f-ss" + cap).value = "";
+    renderPageContext();
+    renderCarousel();
+  };
+}
+bindScreenshotSlot("top");
+bindScreenshotSlot("bottom");
+bindScreenshotSlot("left");
+bindScreenshotSlot("right");
+
+// Preset switch
+document.querySelectorAll("#devicePreset button").forEach(btn => {
+  btn.onclick = () => {
+    state.activePreset = btn.dataset.name;
+    state.current = 0;
+    renderEditor();
+    renderCarousel();
+  };
+});
+
+// Vertical switch (global)
+document.querySelectorAll("#verticalPicker button").forEach(btn => {
+  btn.onclick = () => {
+    state.vertical = btn.dataset.v;
+    document.querySelectorAll("#verticalPicker button").forEach(b =>
+      b.classList.toggle("active", b === btn));
+    renderCarousel();
+  };
+});
+
+// Width input — edits active preset's width
+widthInput.oninput = (e) => {
+  const w = Math.max(320, Math.min(2400, parseInt(e.target.value, 10) || 320));
+  cfg().width = w;
+  $("widthOut").textContent = w + "px";
+  renderCarousel();
+};
+
+// Per-device parametric sliders
+const onPresetSlider = (id, prop, fmt) => {
+  $(id).oninput = (e) => {
+    cfg()[prop] = parseInt(e.target.value, 10);
+    renderEditor();
+    renderCarousel();
+  };
+};
+onPresetSlider("f-height", "height");
+onPresetSlider("f-radius", "radius");
+onPresetSlider("f-gap", "gap");
+onPresetSlider("f-peek", "peek");
+onPresetSlider("f-assetWidth", "assetWidth");
+onPresetSlider("f-contentWidth", "contentWidth");
+
+// SHARED: autoplay
+$("f-autoplay").oninput = (e) => {
+  state.autoplayMs = Math.round(parseFloat(e.target.value) * 1000);
+  renderEditor();
+  resetAutoplay();
+};
+
+$("t-autoplay").onclick = () => {
+  state.autoplay = !state.autoplay;
+  renderEditor();
+  resetAutoplay();
+};
+
+$("inc").onclick = () => {
+  if (state.banners.length >= 8) return;
+  const nextPreset = presets[state.banners.length % presets.length];
+  state.banners.push({
+    ...nextPreset,
+    asset: nextPreset.defaultAsset ? { ...nextPreset.defaultAsset } : null,
+    assetPlacement: "right",
+    oddsMode: "three-way",
+    oddsThreeWay: [
+      { label: "Home", odds: "2.10" },
+      { label: "Draw", odds: "3.40" },
+      { label: "Away", odds: "3.20" },
+    ],
+    oddsBoosted: { label: "Manchester to win", original: "2.50", boosted: "3.50" },
+  });
+  renderTabs(); renderEditor(); renderCarousel();
+};
+$("dec").onclick = () => {
+  if (state.banners.length <= 1) return;
+  state.banners.pop();
+  if (state.activeIdx >= state.banners.length) state.activeIdx = state.banners.length - 1;
+  if (state.visible > state.banners.length) state.visible = state.banners.length;
+  renderTabs(); renderEditor(); renderCarousel();
+};
+
+// SHARED: banners visible at once
+$("visInc").onclick = () => {
+  state.visible = Math.min(3, state.visible + 1, state.banners.length);
+  renderEditor(); renderCarousel();
+};
+$("visDec").onclick = () => {
+  state.visible = Math.max(1, state.visible - 1);
+  renderEditor(); renderCarousel();
+};
+
+// SHARED: T&Cs placement
+document.querySelectorAll("#termsPlacement button").forEach(btn => {
+  btn.onclick = () => {
+    state.termsPlacement = btn.dataset.place;
+    renderEditor(); renderCarousel();
+  };
+});
+
+// Banner content fields (shared across presets)
+const onField = (id, prop, counterId, limit) => {
+  $(id).oninput = (e) => {
+    state.banners[state.activeIdx][prop] = e.target.value;
+    if (counterId && limit) setCounter(counterId, e.target.value, limit);
+    renderCarousel();
+  };
+};
+onField("f-headline", "headline", "c-headline", LIMITS.headline);
+onField("f-body", "body", "c-body", LIMITS.body);
+onField("f-cta", "cta", "c-cta", LIMITS.cta);
+onField("f-terms", "terms");
+onField("f-badge", "badge", "c-badge", LIMITS.badge);
+
+$("t-badge").onclick = () => {
+  const b = state.banners[state.activeIdx];
+  b.showBadge = !b.showBadge;
+  renderEditor(); renderCarousel();
+};
+
+// Bottom type
+document.querySelectorAll("#bottomType button").forEach(btn => {
+  btn.onclick = () => {
+    state.banners[state.activeIdx].bottomType = btn.dataset.bt;
+    renderEditor(); renderCarousel();
+  };
+});
+document.querySelectorAll("#oddsMode button").forEach(btn => {
+  btn.onclick = () => {
+    state.banners[state.activeIdx].oddsMode = btn.dataset.om;
+    renderEditor(); renderCarousel();
+  };
+});
+
+// Three-way odds inputs
+for (let i = 0; i < 3; i++) {
+  $("tw" + i + "l").oninput = (e) => {
+    state.banners[state.activeIdx].oddsThreeWay[i].label = e.target.value;
+    renderCarousel();
+  };
+  $("tw" + i + "o").oninput = (e) => {
+    state.banners[state.activeIdx].oddsThreeWay[i].odds = e.target.value;
+    renderCarousel();
+  };
+}
+// Boosted inputs
+$("bs-label").oninput = (e) => { state.banners[state.activeIdx].oddsBoosted.label = e.target.value; renderCarousel(); };
+$("bs-original").oninput = (e) => { state.banners[state.activeIdx].oddsBoosted.original = e.target.value; renderCarousel(); };
+$("bs-boosted").oninput = (e) => { state.banners[state.activeIdx].oddsBoosted.boosted = e.target.value; renderCarousel(); };
+
+// BG colors
+$("f-bg1").oninput = (e) => { state.banners[state.activeIdx].bg.c1 = e.target.value; renderCarousel(); };
+$("f-bg2").oninput = (e) => { state.banners[state.activeIdx].bg.c2 = e.target.value; renderCarousel(); };
+
+document.querySelectorAll("#bgStyle button").forEach(btn => {
+  btn.onclick = () => {
+    state.banners[state.activeIdx].bg.style = btn.dataset.bg;
+    renderEditor(); renderCarousel();
+  };
+});
+
+document.querySelectorAll("#assetPlacement button").forEach(btn => {
+  btn.onclick = () => {
+    state.banners[state.activeIdx].assetPlacement = btn.dataset.place;
+    renderEditor(); renderCarousel();
+  };
+});
+
+/**
+ * Compute a scale value so that the image's rendered height (with object-fit: contain
+ * inside the asset container) equals the banner height. Cap between 100% and 300%.
+ * Probe runs async — image is loaded off-DOM to read natural dimensions.
+ */
+function autoFitAssetHeight(b) {
+  if (!b || !b.asset || !b.asset.url) return;
+  const probe = new Image();
+  probe.onload = () => {
+    const nW = probe.naturalWidth;
+    const nH = probe.naturalHeight;
+    if (!nW || !nH) return;
+    const c = cfg();
+    const containerW = c.width * (c.assetWidth / 100);
+    const containerH = c.height;
+    const naturalRatio = nW / nH;
+    const containerRatio = containerW / containerH;
+    // With object-fit: contain, rendered height when width-constrained
+    let containedH;
+    if (naturalRatio > containerRatio) {
+      // landscape relative to container → width-constrained
+      containedH = containerW / naturalRatio;
+    } else {
+      // portrait or matched → already height-fills
+      containedH = containerH;
+    }
+    const scale = Math.round((containerH / containedH) * 100);
+    b.asset.fit = "contain";
+    b.asset.scale = Math.max(100, Math.min(300, scale));
+    if (b === state.banners[state.activeIdx]) renderEditor();
+    renderCarousel();
+  };
+  probe.onerror = () => { /* missing file — keep defaults */ };
+  probe.src = b.asset.url;
+}
+
+$("f-asset").onchange = (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const b = state.banners[state.activeIdx];
+    b.asset = {
+      url: ev.target.result,
+      name: file.name,
+      fit: "contain",
+      scale: 100,
+      posX: 50,
+      posY: 50,
+    };
+    renderEditor(); renderCarousel();
+    autoFitAssetHeight(b); // async — refines scale once dimensions are known
+  };
+  reader.readAsDataURL(file);
+};
+
+$("assetClear").onclick = () => {
+  state.banners[state.activeIdx].asset = null;
+  $("f-asset").value = "";
+  renderEditor(); renderCarousel();
+};
+
+// Image editor handlers
+document.querySelectorAll("#assetFit button").forEach(btn => {
+  btn.onclick = () => {
+    const a = state.banners[state.activeIdx].asset;
+    if (!a) return;
+    a.fit = btn.dataset.fit;
+    renderEditor(); renderCarousel();
+  };
+});
+const onAssetSlider = (id, prop, outId, suffix = "%") => {
+  $(id).oninput = (e) => {
+    const a = state.banners[state.activeIdx].asset;
+    if (!a) return;
+    const v = parseInt(e.target.value, 10);
+    a[prop] = v;
+    $(outId).textContent = v + suffix;
+    renderCarousel();
+  };
+};
+onAssetSlider("f-scale", "scale", "scaleOut");
+onAssetSlider("f-posX", "posX", "posXOut");
+onAssetSlider("f-posY", "posY", "posYOut");
+
+$("resetAsset").onclick = () => {
+  const a = state.banners[state.activeIdx].asset;
+  if (!a) return;
+  a.fit = "contain";
+  a.scale = 100;
+  a.posX = 50;
+  a.posY = 50;
+  renderEditor(); renderCarousel();
+};
+
+$("fitHeight").onclick = () => {
+  const b = state.banners[state.activeIdx];
+  if (!b.asset) return;
+  autoFitAssetHeight(b);
+};
+
+// Typography
+$("t-smart").onclick = () => {
+  cfg().smartSize = !cfg().smartSize;
+  renderEditor();
+};
+const onTypo = (id, prop, outId) => {
+  $(id).oninput = (e) => {
+    const v = parseInt(e.target.value, 10);
+    cfg()[prop] = v;
+    $(outId).textContent = v;
+    const c = cfg();
+    if (prop === "hlMin" && v > c.hlMax) { c.hlMax = v; $("f-hlMax").value = v; $("hlMaxOut").textContent = v; }
+    if (prop === "hlMax" && v < c.hlMin) { c.hlMin = v; $("f-hlMin").value = v; $("hlMinOut").textContent = v; }
+    if (prop === "bdMin" && v > c.bdMax) { c.bdMax = v; $("f-bdMax").value = v; $("bdMaxOut").textContent = v; }
+    if (prop === "bdMax" && v < c.bdMin) { c.bdMin = v; $("f-bdMin").value = v; $("bdMinOut").textContent = v; }
+    applyTypography();
+  };
+};
+onTypo("f-hlMin", "hlMin", "hlMinOut");
+onTypo("f-hlMax", "hlMax", "hlMaxOut");
+onTypo("f-bdMin", "bdMin", "bdMinOut");
+onTypo("f-bdMax", "bdMax", "bdMaxOut");
+
+window.addEventListener("keydown", (e) => {
+  if (document.activeElement && ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName)) return;
+  if (e.key === "ArrowLeft") { goTo(state.current - 1); resetAutoplay(true); }
+  if (e.key === "ArrowRight") { goTo(state.current + 1); resetAutoplay(true); }
+});
+
+/* ============================================================
+   PERSISTENCE — auto-save, export, import, reset
+============================================================ */
+const STORAGE_KEY = "banner-playground-v1";
+const SCHEMA_VERSION = 1;
+let initialized = false;
+let saveTimer = null;
+let autoSaveEnabled = true;
+
+function getSnapshot() {
+  return {
+    version: SCHEMA_VERSION,
+    activePreset: state.activePreset,
+    vertical: state.vertical,
+    activeIdx: state.activeIdx,
+    current: state.current,
+    presetData: state.presetData,
+    banners: state.banners,
+    screenshots: state.screenshots,
+    autoplay: state.autoplay,
+    autoplayMs: state.autoplayMs,
+    savedAt: new Date().toISOString(),
+  };
+}
+
+function applySnapshot(snap) {
+  if (!snap || typeof snap !== "object") return false;
+  // Defensive merge — only assign fields that look right
+  if (snap.activePreset && state.presetData[snap.activePreset]) {
+    state.activePreset = snap.activePreset;
+  }
+  if (snap.vertical === "casino" || snap.vertical === "sportsbook") {
+    state.vertical = snap.vertical;
+  }
+  if (snap.screenshots && typeof snap.screenshots === "object") {
+    // Merge defensively
+    for (const dev of Object.keys(state.screenshots)) {
+      if (snap.screenshots[dev]) {
+        for (const v of Object.keys(state.screenshots[dev])) {
+          if (snap.screenshots[dev][v]) {
+            state.screenshots[dev][v] = { ...state.screenshots[dev][v], ...snap.screenshots[dev][v] };
+          }
+        }
+      }
+    }
+  }
+  if (snap.presetData && typeof snap.presetData === "object") {
+    // Merge per-preset so we keep new defaults if older snapshot is missing fields
+    for (const key of Object.keys(state.presetData)) {
+      if (snap.presetData[key]) {
+        state.presetData[key] = { ...state.presetData[key], ...snap.presetData[key] };
+      }
+    }
+  }
+  if (Array.isArray(snap.banners) && snap.banners.length) {
+    state.banners = snap.banners;
+  }
+  state.activeIdx = Math.max(0, Math.min(snap.activeIdx ?? 0, state.banners.length - 1));
+  state.current = Math.max(0, snap.current ?? 0);
+  if (typeof snap.autoplay === "boolean") state.autoplay = snap.autoplay;
+  if (typeof snap.autoplayMs === "number") state.autoplayMs = snap.autoplayMs;
+  return true;
+}
+
+function setSaveStatus(text, kind = "ok") {
+  const el = $("saveStatus");
+  const textEl = $("saveStatusText");
+  if (!el || !textEl) return;
+  textEl.textContent = text;
+  el.classList.toggle("error", kind === "error");
+  el.classList.toggle("dirty", kind === "dirty");
+}
+
+function scheduleSave() {
+  if (!initialized || !autoSaveEnabled) return;
+  setSaveStatus("Saving…", "dirty");
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try {
+      const json = JSON.stringify(getSnapshot());
+      localStorage.setItem(STORAGE_KEY, json);
+      const kb = Math.round(json.length / 1024);
+      setSaveStatus(`Saved · ${kb} KB`, "ok");
+    } catch (e) {
+      const reason = e && e.name === "QuotaExceededError" ? "storage full — use Export" : "save failed";
+      setSaveStatus(reason, "error");
+    }
+  }, 400);
+}
+
+function loadFromStorage() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (e) {
+    console.warn("Failed to load saved state", e);
+    return null;
+  }
+}
+
+function exportToFile() {
+  try {
+    const snap = getSnapshot();
+    const json = JSON.stringify(snap, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    a.href = url;
+    a.download = `banner-playground-${stamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setSaveStatus("Exported to file", "ok");
+  } catch (e) {
+    setSaveStatus("Export failed", "error");
+  }
+}
+
+function importFromFile(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const snap = JSON.parse(e.target.result);
+      const ok = applySnapshot(snap);
+      if (!ok) throw new Error("Invalid format");
+      renderTabs(); renderEditor(); renderCarousel();
+      setSaveStatus("Imported · " + (snap.savedAt ? snap.savedAt.slice(0, 10) : "ok"), "ok");
+    } catch (err) {
+      setSaveStatus("Import failed — invalid file", "error");
+    }
+  };
+  reader.onerror = () => setSaveStatus("Could not read file", "error");
+  reader.readAsText(file);
+}
+
+function resetToDefaults() {
+  if (!confirm("Reset everything to defaults?\n\nThis will erase your saved settings, uploaded asset images, and page-context screenshots.")) return;
+  try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+  location.reload();
+}
+
+// Wire up persistence UI
+$("btnExport").onclick = exportToFile;
+$("btnImport").onclick = () => $("f-import").click();
+$("f-import").onchange = (e) => {
+  const f = e.target.files[0];
+  if (f) importFromFile(f);
+  e.target.value = "";
+};
+$("btnReset").onclick = resetToDefaults;
+$("t-autosave").onclick = () => {
+  autoSaveEnabled = !autoSaveEnabled;
+  $("t-autosave").classList.toggle("on", autoSaveEnabled);
+  if (autoSaveEnabled) scheduleSave();
+  else setSaveStatus("Auto-save off", "dirty");
+};
+
+// Hook auto-save into renderCarousel (runs after every meaningful change)
+const _renderCarouselOrig = renderCarousel;
+renderCarousel = function() {
+  _renderCarouselOrig();
+  scheduleSave();
+};
+
+/* ============================================================
+   INIT
+============================================================ */
+// Try to restore from localStorage before first render
+const stored = loadFromStorage();
+if (stored) applySnapshot(stored);
+
+renderTabs();
+renderSwatches();
+renderEditor();
+renderCarousel();
+initialized = true;
+if (stored) setSaveStatus(`Restored from ${stored.savedAt ? stored.savedAt.slice(0, 16).replace("T", " ") : "browser"}`, "ok");
+else setSaveStatus("Ready (no saved data yet)", "ok");
+
+// Auto-fit default assets (file-path images that haven't been customized).
+// Only runs when starting from defaults — if scale is exactly 100% and we have an asset,
+// the user hasn't tweaked it yet, so safe to auto-fit.
+if (!stored) {
+  state.banners.forEach(b => {
+    if (b.asset && b.asset.scale === 100) autoFitAssetHeight(b);
+  });
+}
+</script>
+</body>
+</html>
