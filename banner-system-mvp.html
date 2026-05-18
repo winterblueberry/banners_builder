@@ -909,6 +909,10 @@
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
 
+  /* Focus-visible rings — keyboard navigation */
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button:focus-visible, .swatch:focus-visible, .dot:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
   /* ============ PAGE CONTEXT ============ */
   .page-context {
     user-select: none;
@@ -1416,9 +1420,9 @@
 
   <!-- ============ SAVE & LOAD DRAWER ============ -->
   <div class="drawer-backdrop hidden" id="drawerBackdrop"></div>
-  <aside class="save-drawer hidden" id="saveDrawer">
+  <aside class="save-drawer hidden" id="saveDrawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
     <div class="drawer-header">
-      <h2>Save &amp; Load</h2>
+      <h2 id="drawerTitle">Save &amp; Load</h2>
       <button class="icon-btn" id="closeSaveDrawer" title="Close">×</button>
     </div>
     <div class="drawer-body">
@@ -1707,6 +1711,15 @@ function scheduleRender(fn) {
   });
 }
 
+// Set active class + aria-pressed on every button inside a segmented control.
+function setSegActive(containerId, testFn) {
+  document.querySelectorAll(containerId + " button").forEach(btn => {
+    const active = testFn(btn);
+    btn.classList.toggle("active", active);
+    btn.setAttribute("aria-pressed", active ? "true" : "false");
+  });
+}
+
 /* ============================================================
    RENDER — sidebar
 ============================================================ */
@@ -1715,6 +1728,7 @@ function renderTabs() {
   state.banners.forEach((_, i) => {
     const t = document.createElement("button");
     t.className = "banner-tab" + (i === state.activeIdx ? " active" : "");
+    t.setAttribute("aria-label", `Edit banner ${i + 1}`);
     t.textContent = `Banner ${i + 1}`;
     t.onclick = () => { state.activeIdx = i; renderTabs(); renderEditor(); };
     tabsEl.appendChild(t);
@@ -1750,13 +1764,9 @@ function renderEditor() {
   $("presetPill").textContent = PRESET_LABEL[state.activePreset];
 
   // Preset highlight
-  document.querySelectorAll("#devicePreset button").forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.name === state.activePreset);
-  });
+  setSegActive("#devicePreset", btn => btn.dataset.name === state.activePreset);
   // Vertical highlight
-  document.querySelectorAll("#verticalPicker button").forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.v === state.vertical);
-  });
+  setSegActive("#verticalPicker", btn => btn.dataset.v === state.vertical);
 
   // Banner content fields
   $("f-badge").value = b.badge || "";
@@ -1778,16 +1788,12 @@ function renderEditor() {
   $("badge-field").style.display = b.showBadge ? "block" : "none";
 
   // Bottom type
-  document.querySelectorAll("#bottomType button").forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.bt === b.bottomType);
-  });
+  setSegActive("#bottomType", btn => btn.dataset.bt === b.bottomType);
   $("cta-config").style.display = b.bottomType === "cta" ? "block" : "none";
   $("odds-config").style.display = b.bottomType === "odds" ? "block" : "none";
 
   // Odds mode
-  document.querySelectorAll("#oddsMode button").forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.om === b.oddsMode);
-  });
+  setSegActive("#oddsMode", btn => btn.dataset.om === b.oddsMode);
   $("threeway-config").style.display = b.oddsMode === "three-way" ? "block" : "none";
   $("boosted-config").style.display = b.oddsMode === "boosted" ? "block" : "none";
 
@@ -1801,9 +1807,7 @@ function renderEditor() {
   $("bs-boosted").value = b.oddsBoosted.boosted;
 
   // BG
-  document.querySelectorAll("#bgStyle button").forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.bg === b.bg.style);
-  });
+  setSegActive("#bgStyle", btn => btn.dataset.bg === b.bg.style);
   $("bg2Wrap").style.display = b.bg.style === "solid" ? "none" : "block";
 
   // Asset
@@ -1818,9 +1822,7 @@ function renderEditor() {
     const scale = b.asset.scale ?? 100;
     const posX = b.asset.posX ?? 50;
     const posY = b.asset.posY ?? 50;
-    document.querySelectorAll("#assetFit button").forEach(btn => {
-      btn.classList.toggle("active", btn.dataset.fit === fit);
-    });
+    setSegActive("#assetFit", btn => btn.dataset.fit === fit);
     $("f-scale").value = scale; $("scaleOut").textContent = scale + "%";
     $("f-posX").value = posX; $("posXOut").textContent = posX + "%";
     $("f-posY").value = posY; $("posYOut").textContent = posY + "%";
@@ -1829,9 +1831,7 @@ function renderEditor() {
     $("uploadLabel").style.display = "block";
     $("asset-editor").style.display = "none";
   }
-  document.querySelectorAll("#assetPlacement button").forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.place === b.assetPlacement);
-  });
+  setSegActive("#assetPlacement", btn => btn.dataset.place === b.assetPlacement);
 
   // Full background image previews
   const bgImg = b.bgImage || { mobile: null, desktop: null };
@@ -1871,9 +1871,7 @@ function renderEditor() {
   $("inc").disabled = state.banners.length >= 8;
   $("countVal").textContent = state.banners.length;
 
-  document.querySelectorAll("#termsPlacement button").forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.place === state.termsPlacement);
-  });
+  setSegActive("#termsPlacement", btn => btn.dataset.place === state.termsPlacement);
 
   $("autoplayOut").textContent = (state.autoplayMs / 1000).toFixed(1) + "s";
   $("f-autoplay").value = state.autoplayMs / 1000;
@@ -1899,9 +1897,11 @@ function renderEditor() {
 function renderSwatches() {
   swatchesEl.innerHTML = "";
   swatchPresets.forEach(([c1, c2]) => {
-    const s = document.createElement("div");
+    const s = document.createElement("button");
+    s.type = "button";
     s.className = "swatch";
-    s.style.background = `linear-gradient(135deg, ${c1}, ${c2})`;
+    s.style.cssText = `background: linear-gradient(135deg, ${c1}, ${c2}); border: 2px solid transparent; padding: 0;`;
+    s.setAttribute("aria-label", `Set gradient ${c1} to ${c2}`);
     s.title = `${c1} → ${c2}`;
     s.onclick = () => {
       const b = state.banners[state.activeIdx];
@@ -2046,7 +2046,7 @@ function renderCarousel() {
   const stops = maxCurrent() + 1;
   if (stops > 1) {
     paginationEl.innerHTML = Array.from({ length: stops }, (_, i) =>
-      `<button class="dot ${i === state.current ? "active" : ""}" data-i="${i}"></button>`
+      `<button class="dot ${i === state.current ? "active" : ""}" data-i="${i}" aria-label="Go to banner ${i + 1}" aria-current="${i === state.current ? 'true' : 'false'}"></button>`
     ).join("");
     paginationWrapEl.style.display = "flex";
   } else {
@@ -2195,13 +2195,18 @@ $("btnHideSidebar").onclick = () => appEl.classList.add("sidebar-hidden");
 $("btnShowSidebar").onclick = () => appEl.classList.remove("sidebar-hidden");
 
 // Save & Load drawer
+let _drawerReturnFocus = null;
 function openDrawer() {
+  _drawerReturnFocus = document.activeElement;
   $("saveDrawer").classList.remove("hidden");
   $("drawerBackdrop").classList.remove("hidden");
+  const first = $("saveDrawer").querySelector("button, [href], input, select, textarea");
+  if (first) first.focus();
 }
 function closeDrawer() {
   $("saveDrawer").classList.add("hidden");
   $("drawerBackdrop").classList.add("hidden");
+  if (_drawerReturnFocus) { _drawerReturnFocus.focus(); _drawerReturnFocus = null; }
 }
 $("btnSaveDrawer").onclick = openDrawer;
 $("closeSaveDrawer").onclick = closeDrawer;
@@ -2274,8 +2279,7 @@ document.querySelectorAll("#devicePreset button").forEach(btn => {
 document.querySelectorAll("#verticalPicker button").forEach(btn => {
   btn.onclick = () => {
     state.vertical = btn.dataset.v;
-    document.querySelectorAll("#verticalPicker button").forEach(b =>
-      b.classList.toggle("active", b === btn));
+    setSegActive("#verticalPicker", b => b === btn);
     renderCarousel();
   };
 });
