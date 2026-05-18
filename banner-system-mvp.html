@@ -731,8 +731,6 @@
     width: 22px; border-radius: 4px;
     background: #0B1220;
   }
-  .progress { display: none !important; }
-
   /* ---------- Banner component ---------- */
   .banner {
     position: relative;
@@ -1455,7 +1453,7 @@
             <div class="carousel" id="carousel"></div>
             <div class="pagination-wrap" id="paginationWrap">
               <div class="pagination" id="pagination"></div>
-              <div class="progress hidden" id="progress"><div class="progress-bar" id="progressBar"></div></div>
+
             </div>
           </div>
           <div class="page-context right" id="ctxRight"></div>
@@ -1593,8 +1591,6 @@ const $ = (id) => document.getElementById(id);
 const carouselEl = $("carousel");
 const paginationEl = $("pagination");
 const paginationWrapEl = $("paginationWrap");
-const progressEl = $("progress");
-const progressBarEl = $("progressBar");
 const viewportEl = $("viewport");
 const widthInput = $("widthInput");
 const metaInfo = $("metaInfo");
@@ -1638,6 +1634,78 @@ function trackTransform() {
 }
 
 const PRESET_LABEL = { mobile: "Mobile", desktop: "Desktop" };
+
+// Fast-path banner update — mutates only the affected DOM nodes, falls back to renderCarousel().
+function patchBanner(i, field) {
+  const b = state.banners[i];
+  const slide = carouselEl.querySelector(`.slide[data-i="${i}"]`);
+  if (!slide) { renderCarousel(); return; }
+  const banner = slide.querySelector('.banner');
+  if (!banner) { renderCarousel(); return; }
+
+  if (field === 'headline') {
+    const el = banner.querySelector('.headline');
+    if (el) { el.textContent = b.headline || ''; return; }
+  } else if (field === 'body') {
+    const el = banner.querySelector('.body');
+    if (el) { el.textContent = b.body || ''; return; }
+  } else if (field === 'cta') {
+    const el = banner.querySelector('.cta');
+    const shouldShow = b.bottomType === 'cta' && b.cta;
+    if (el && shouldShow) { el.textContent = b.cta + ' →'; return; }
+  } else if (field === 'badge') {
+    const el = banner.querySelector('.badge');
+    const shouldShow = b.showBadge && b.badge;
+    if (el && shouldShow) { el.textContent = b.badge; return; }
+  } else if (field === 'terms') {
+    const termsEl = banner.querySelector('.terms-inside, .terms-frosted')
+                    || slide.querySelector('.terms-outside');
+    if (termsEl) { termsEl.textContent = b.terms || ''; return; }
+  } else if (field === 'bg') {
+    const bgEl = banner.querySelector('.banner-bg');
+    if (bgEl) { bgEl.style.background = bgCss(b); return; }
+  } else if (field === 'odds-threeway') {
+    const oddsEl = banner.querySelector('.banner-odds.three-way');
+    if (oddsEl) {
+      const btns = oddsEl.querySelectorAll('.odds-btn');
+      b.oddsThreeWay.forEach((o, idx) => {
+        if (!btns[idx]) return;
+        const lbl = btns[idx].querySelector('.odds-label');
+        const val = btns[idx].querySelector('.odds-value');
+        if (lbl) lbl.textContent = o.label;
+        if (val) val.textContent = o.odds;
+      });
+      return;
+    }
+  } else if (field === 'odds-boosted') {
+    const oddsEl = banner.querySelector('.banner-odds.boosted');
+    if (oddsEl) {
+      const o = b.oddsBoosted;
+      const lbl = oddsEl.querySelector('.odds-label');
+      const orig = oddsEl.querySelector('.odds-original');
+      const bst = oddsEl.querySelector('.odds-boosted');
+      if (lbl) lbl.textContent = o.label;
+      if (orig) orig.textContent = o.original;
+      if (bst) bst.textContent = o.boosted;
+      return;
+    }
+  }
+  renderCarousel();
+}
+
+// rAF-coalesced render scheduler — batches multiple render calls into one frame.
+let _renderQueued = false;
+const _pendingRenders = new Set();
+function scheduleRender(fn) {
+  _pendingRenders.add(fn);
+  if (_renderQueued) return;
+  _renderQueued = true;
+  requestAnimationFrame(() => {
+    _renderQueued = false;
+    const fns = [..._pendingRenders]; _pendingRenders.clear();
+    fns.forEach(f => f());
+  });
+}
 
 /* ============================================================
    RENDER — sidebar
@@ -1994,9 +2062,9 @@ function renderCarousel() {
     d.onclick = () => { goTo(parseInt(d.dataset.i, 10)); resetAutoplay(true); };
   });
 
-  attachSwipe();
   updateMeta();
   resetAutoplay();
+  scheduleSave();
 }
 
 function goTo(i, smooth = true) {
@@ -2073,19 +2141,6 @@ function renderScreenshotSlot(kind, data) {
   }
 }
 
-function attachSwipe() {
-  const track = $("track");
-  if (!track) return;
-  let startX = null;
-  track.addEventListener("touchstart", (e) => { startX = e.touches[0].clientX; }, { passive: true });
-  track.addEventListener("touchend", (e) => {
-    if (startX === null) return;
-    const dx = e.changedTouches[0].clientX - startX;
-    if (Math.abs(dx) > 40) { goTo(state.current + (dx < 0 ? 1 : -1)); resetAutoplay(true); }
-    startX = null;
-  });
-}
-
 function updateMeta() {
   const c = cfg();
   metaInfo.textContent = `${PRESET_LABEL[state.activePreset]} · ${c.width}px · ${state.banners.length} banner${state.banners.length === 1 ? "" : "s"} · ${effectiveVisible()} visible · ${c.height}px tall`;
@@ -2099,16 +2154,8 @@ const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matc
 
 function resetAutoplay() {
   clearTimeout(autoTimer);
-  if (progressBarEl) {
-    progressBarEl.classList.remove("run");
-    progressBarEl.style.width = "0%";
-  }
   const eligible = state.autoplay && !reducedMotion && state.banners.length > effectiveVisible();
-  progressEl.classList.toggle("hidden", !eligible);
   if (!eligible) return;
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => { progressBarEl.classList.add("run"); });
-  });
   autoTimer = setTimeout(() => {
     if (!state.autoplay) return;
     const next = state.current >= maxCurrent() ? 0 : state.current + 1;
@@ -2120,11 +2167,6 @@ function resetAutoplay() {
 function pauseAutoplay() {
   clearTimeout(autoTimer);
   autoTimer = null;
-  if (progressBarEl) {
-    const w = getComputedStyle(progressBarEl).width;
-    progressBarEl.classList.remove("run");
-    progressBarEl.style.width = w;
-  }
 }
 
 viewportEl.addEventListener("mouseenter", pauseAutoplay);
@@ -2225,8 +2267,8 @@ widthInput.oninput = (e) => {
 const onPresetSlider = (id, prop, fmt) => {
   $(id).oninput = (e) => {
     cfg()[prop] = parseInt(e.target.value, 10);
-    renderEditor();
-    renderCarousel();
+    scheduleRender(renderEditor);
+    scheduleRender(renderCarousel);
   };
 };
 onPresetSlider("f-height", "height");
@@ -2297,7 +2339,7 @@ const onField = (id, prop, counterId, limit) => {
   $(id).oninput = (e) => {
     state.banners[state.activeIdx][prop] = e.target.value;
     if (counterId && limit) setCounter(counterId, e.target.value, limit);
-    renderCarousel();
+    patchBanner(state.activeIdx, prop);
   };
 };
 onField("f-headline", "headline", "c-headline", LIMITS.headline);
@@ -2330,21 +2372,21 @@ document.querySelectorAll("#oddsMode button").forEach(btn => {
 for (let i = 0; i < 3; i++) {
   $("tw" + i + "l").oninput = (e) => {
     state.banners[state.activeIdx].oddsThreeWay[i].label = e.target.value;
-    renderCarousel();
+    patchBanner(state.activeIdx, 'odds-threeway');
   };
   $("tw" + i + "o").oninput = (e) => {
     state.banners[state.activeIdx].oddsThreeWay[i].odds = e.target.value;
-    renderCarousel();
+    patchBanner(state.activeIdx, 'odds-threeway');
   };
 }
 // Boosted inputs
-$("bs-label").oninput = (e) => { state.banners[state.activeIdx].oddsBoosted.label = e.target.value; renderCarousel(); };
-$("bs-original").oninput = (e) => { state.banners[state.activeIdx].oddsBoosted.original = e.target.value; renderCarousel(); };
-$("bs-boosted").oninput = (e) => { state.banners[state.activeIdx].oddsBoosted.boosted = e.target.value; renderCarousel(); };
+$("bs-label").oninput = (e) => { state.banners[state.activeIdx].oddsBoosted.label = e.target.value; patchBanner(state.activeIdx, 'odds-boosted'); };
+$("bs-original").oninput = (e) => { state.banners[state.activeIdx].oddsBoosted.original = e.target.value; patchBanner(state.activeIdx, 'odds-boosted'); };
+$("bs-boosted").oninput = (e) => { state.banners[state.activeIdx].oddsBoosted.boosted = e.target.value; patchBanner(state.activeIdx, 'odds-boosted'); };
 
 // BG colors
-$("f-bg1").oninput = (e) => { state.banners[state.activeIdx].bg.c1 = e.target.value; renderCarousel(); };
-$("f-bg2").oninput = (e) => { state.banners[state.activeIdx].bg.c2 = e.target.value; renderCarousel(); };
+$("f-bg1").oninput = (e) => { state.banners[state.activeIdx].bg.c1 = e.target.value; patchBanner(state.activeIdx, 'bg'); };
+$("f-bg2").oninput = (e) => { state.banners[state.activeIdx].bg.c2 = e.target.value; patchBanner(state.activeIdx, 'bg'); };
 
 document.querySelectorAll("#bgStyle button").forEach(btn => {
   btn.onclick = () => {
@@ -2438,7 +2480,7 @@ const onAssetSlider = (id, prop, outId, suffix = "%") => {
     const v = parseInt(e.target.value, 10);
     a[prop] = v;
     $(outId).textContent = v + suffix;
-    renderCarousel();
+    scheduleRender(renderCarousel);
   };
 };
 onAssetSlider("f-scale", "scale", "scaleOut");
@@ -2701,13 +2743,6 @@ $("t-autosave").onclick = () => {
   else setSaveStatus("Auto-save off", "dirty");
 };
 
-// Hook auto-save into renderCarousel (runs after every meaningful change)
-const _renderCarouselOrig = renderCarousel;
-renderCarousel = function() {
-  _renderCarouselOrig();
-  scheduleSave();
-};
-
 /* ============================================================
    INIT
 ============================================================ */
@@ -2736,6 +2771,16 @@ if (!stored && !bootstrapped) {
     if (b.asset && b.asset.scale === 100) autoFitAssetHeight(b);
   });
 }
+
+// Touch-swipe delegation on the stable carouselEl (bound once, not per-render).
+let _swipeStartX = null;
+carouselEl.addEventListener("touchstart", (e) => { _swipeStartX = e.touches[0].clientX; }, { passive: true });
+carouselEl.addEventListener("touchend", (e) => {
+  if (_swipeStartX === null) return;
+  const dx = e.changedTouches[0].clientX - _swipeStartX;
+  if (Math.abs(dx) > 40) { goTo(state.current + (dx < 0 ? 1 : -1)); resetAutoplay(true); }
+  _swipeStartX = null;
+});
 </script>
 </body>
 </html>
