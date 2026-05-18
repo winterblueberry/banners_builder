@@ -2207,20 +2207,45 @@ $("btnSaveDrawer").onclick = openDrawer;
 $("closeSaveDrawer").onclick = closeDrawer;
 $("drawerBackdrop").onclick = closeDrawer;
 
+// Downscale an uploaded image to maxEdge px on the longest side via canvas.
+// Keeps PNG for small transparent images; converts large files to JPEG at 0.85 quality.
+function downscaleImage(file, maxEdge) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const { naturalWidth: w, naturalHeight: h } = img;
+        if (w <= maxEdge && h <= maxEdge) { resolve(ev.target.result); return; }
+        const ratio = Math.min(maxEdge / w, maxEdge / h);
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(w * ratio);
+        canvas.height = Math.round(h * ratio);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        const usePng = file.type === 'image/png' && file.size < 2 * 1024 * 1024;
+        resolve(canvas.toDataURL(usePng ? 'image/png' : 'image/jpeg', 0.85));
+      };
+      img.onerror = () => resolve(ev.target.result);
+      img.src = ev.target.result;
+    };
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(file);
+  });
+}
+
 // Screenshot uploads (per preset + vertical)
 function bindScreenshotSlot(kind) {
   const cap = kind.charAt(0).toUpperCase() + kind.slice(1);
   $("f-ss" + cap).onchange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
+    downscaleImage(file, 2000).then(url => {
+      if (!url) return;
       const slot = currentScreenshotSlot();
-      slot[kind] = { url: ev.target.result, name: file.name };
+      slot[kind] = { url, name: file.name };
       renderPageContext();
       renderCarousel();
-    };
-    reader.readAsDataURL(file);
+    });
   };
   $("ss" + cap + "Clear").onclick = () => {
     const slot = currentScreenshotSlot();
@@ -2441,21 +2466,13 @@ function autoFitAssetHeight(b) {
 $("f-asset").onchange = (e) => {
   const file = e.target.files[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (ev) => {
+  downscaleImage(file, 1600).then(url => {
+    if (!url) return;
     const b = state.banners[state.activeIdx];
-    b.asset = {
-      url: ev.target.result,
-      name: file.name,
-      fit: "contain",
-      scale: 100,
-      posX: 50,
-      posY: 50,
-    };
+    b.asset = { url, name: file.name, fit: "contain", scale: 100, posX: 50, posY: 50 };
     renderEditor(); renderCarousel();
-    autoFitAssetHeight(b); // async — refines scale once dimensions are known
-  };
-  reader.readAsDataURL(file);
+    autoFitAssetHeight(b);
+  });
 };
 
 $("assetClear").onclick = () => {
@@ -2539,14 +2556,13 @@ function bindBgSlot(dev) {
   $("f-bg" + dev).onchange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
+    downscaleImage(file, 1600).then(url => {
+      if (!url) return;
       const b = state.banners[state.activeIdx];
       if (!b.bgImage) b.bgImage = { mobile: null, desktop: null };
-      b.bgImage[dev.toLowerCase()] = { url: ev.target.result, name: file.name };
+      b.bgImage[dev.toLowerCase()] = { url, name: file.name };
       renderEditor(); renderCarousel();
-    };
-    reader.readAsDataURL(file);
+    });
   };
   $("bg" + dev + "Clear").onclick = () => {
     const b = state.banners[state.activeIdx];
@@ -2559,6 +2575,9 @@ bindBgSlot("Mobile");
 bindBgSlot("Desktop");
 
 window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !$("saveDrawer").classList.contains("hidden")) {
+    closeDrawer(); return;
+  }
   if (document.activeElement && ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName)) return;
   if (e.key === "ArrowLeft") { goTo(state.current - 1); resetAutoplay(true); }
   if (e.key === "ArrowRight") { goTo(state.current + 1); resetAutoplay(true); }
@@ -2582,6 +2601,7 @@ function getSnapshot() {
     vertical: state.vertical,
     activeIdx: state.activeIdx,
     current: state.current,
+    visible: state.visible,
     presetData: state.presetData,
     banners: state.banners,
     screenshots: state.screenshots,
@@ -2591,8 +2611,48 @@ function getSnapshot() {
   };
 }
 
+// Schema migration — add cases here as SCHEMA_VERSION increments:
+//   if (v < 2) { snap.newField = snap.oldField; delete snap.oldField; v = 2; }
+function migrate(snap) {
+  // Currently at v1; no migrations needed yet.
+  snap.version = SCHEMA_VERSION;
+  return snap;
+}
+
+// Ensures every banner has all expected fields so the editor never throws on old saves.
+function normaliseBanner(b) {
+  const defaults = {
+    headline: "", body: "", badge: "", showBadge: false,
+    bottomType: "cta", cta: "",
+    oddsMode: "three-way",
+    oddsThreeWay: [
+      { label: "Home", odds: "2.10" },
+      { label: "Draw", odds: "3.40" },
+      { label: "Away", odds: "3.20" },
+    ],
+    oddsBoosted: { label: "", original: "", boosted: "" },
+    terms: "",
+    bg: { style: "gradient", c1: "#1a1a2e", c2: "#16213e" },
+    bgImage: { mobile: null, desktop: null },
+    asset: null,
+    assetPlacement: "right",
+  };
+  const merged = { ...defaults, ...b };
+  merged.bg = { ...defaults.bg, ...(b.bg || {}) };
+  merged.bgImage = { ...defaults.bgImage, ...(b.bgImage || {}) };
+  merged.oddsBoosted = { ...defaults.oddsBoosted, ...(b.oddsBoosted || {}) };
+  merged.oddsThreeWay = (Array.isArray(b.oddsThreeWay) && b.oddsThreeWay.length === 3)
+    ? b.oddsThreeWay
+    : defaults.oddsThreeWay;
+  if (merged.asset) {
+    merged.asset = { fit: "contain", scale: 100, posX: 50, posY: 50, ...merged.asset };
+  }
+  return merged;
+}
+
 function applySnapshot(snap) {
   if (!snap || typeof snap !== "object") return false;
+  migrate(snap);
   // Defensive merge — only assign fields that look right
   if (snap.activePreset && state.presetData[snap.activePreset]) {
     state.activePreset = snap.activePreset;
@@ -2638,10 +2698,14 @@ function applySnapshot(snap) {
     }
   }
   if (Array.isArray(snap.banners) && snap.banners.length) {
-    state.banners = snap.banners;
+    state.banners = snap.banners.map(normaliseBanner);
   }
   state.activeIdx = Math.max(0, Math.min(snap.activeIdx ?? 0, state.banners.length - 1));
-  state.current = Math.max(0, snap.current ?? 0);
+  if (typeof snap.visible === "number") {
+    state.visible = Math.max(1, Math.min(3, snap.visible, state.banners.length));
+  }
+  const _maxCur = Math.max(0, state.banners.length - state.visible);
+  state.current = Math.max(0, Math.min(_maxCur, snap.current ?? 0));
   if (typeof snap.autoplay === "boolean") state.autoplay = snap.autoplay;
   if (typeof snap.autoplayMs === "number") state.autoplayMs = snap.autoplayMs;
   return true;
@@ -2663,8 +2727,12 @@ function scheduleSave() {
   saveTimer = setTimeout(() => {
     try {
       const json = JSON.stringify(getSnapshot());
-      localStorage.setItem(STORAGE_KEY, json);
       const kb = Math.round(json.length / 1024);
+      if (json.length > 4.5 * 1024 * 1024) {
+        setSaveStatus(`Too large for browser (${kb} KB) — use Export`, "error");
+        return;
+      }
+      localStorage.setItem(STORAGE_KEY, json);
       setSaveStatus(`Saved · ${kb} KB`, "ok");
     } catch (e) {
       const reason = e && e.name === "QuotaExceededError" ? "storage full — use Export" : "save failed";
