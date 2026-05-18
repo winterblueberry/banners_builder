@@ -1625,7 +1625,7 @@ function bgCss(b) {
   // Per-device full background image wins over gradient/solid
   const bgImg = b.bgImage && b.bgImage[state.activePreset];
   if (bgImg && bgImg.url) {
-    return `url("${bgImg.url}") center/cover no-repeat`;
+    return `url('${bgImg.url}') center/cover no-repeat`;
   }
   const { style, c1, c2 } = b.bg;
   if (style === "solid") return c1;
