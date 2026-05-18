@@ -1712,8 +1712,13 @@ function scheduleRender(fn) {
 }
 
 // Set active class + aria-pressed on every button inside a segmented control.
+// Results are cached by containerId so the DOM is only queried once per container.
+const _segCache = new Map();
 function setSegActive(containerId, testFn) {
-  document.querySelectorAll(containerId + " button").forEach(btn => {
+  if (!_segCache.has(containerId)) {
+    _segCache.set(containerId, [...document.querySelectorAll(containerId + " button")]);
+  }
+  _segCache.get(containerId).forEach(btn => {
     const active = testFn(btn);
     btn.classList.toggle("active", active);
     btn.setAttribute("aria-pressed", active ? "true" : "false");
@@ -1756,19 +1761,52 @@ function applyTypography() {
   viewportEl.style.setProperty("--terms-size", (c.termsSize || 10) + "px");
 }
 
-function renderEditor() {
-  const b = state.banners[state.activeIdx];
-  const c = cfg();
-
-  // Preset pill
+function syncHeader() {
   $("presetPill").textContent = PRESET_LABEL[state.activePreset];
-
-  // Preset highlight
   setSegActive("#devicePreset", btn => btn.dataset.name === state.activePreset);
-  // Vertical highlight
   setSegActive("#verticalPicker", btn => btn.dataset.v === state.vertical);
+}
 
-  // Banner content fields
+function syncLayoutPanel() {
+  const c = cfg();
+  $("widthOut").textContent = c.width + "px";
+  widthInput.value = c.width;
+  $("heightOut").textContent = c.height + "px"; $("f-height").value = c.height;
+  $("radiusOut").textContent = c.radius + "px"; $("f-radius").value = c.radius;
+  $("gapOut").textContent = c.gap + "px"; $("f-gap").value = c.gap;
+  $("peekOut").textContent = c.peek + "%"; $("f-peek").value = c.peek;
+  $("assetWidthOut").textContent = c.assetWidth + "%"; $("f-assetWidth").value = c.assetWidth;
+  $("contentWidthOut").textContent = c.contentWidth + "%"; $("f-contentWidth").value = c.contentWidth;
+  $("t-smart").classList.toggle("on", c.smartSize);
+  $("f-hlMin").value = c.hlMin; $("hlMinOut").textContent = c.hlMin;
+  $("f-hlMax").value = c.hlMax; $("hlMaxOut").textContent = c.hlMax;
+  $("f-bdMin").value = c.bdMin; $("bdMinOut").textContent = c.bdMin;
+  $("f-bdMax").value = c.bdMax; $("bdMaxOut").textContent = c.bdMax;
+  const ts = c.termsSize || 10;
+  $("f-termsSize").value = ts; $("termsSizeOut").textContent = ts + "px";
+  $("hl-min-row").style.display = c.smartSize ? "grid" : "none";
+  $("bd-min-row").style.display = c.smartSize ? "grid" : "none";
+  $("hl-max-label").textContent = c.smartSize ? "Max" : "Size";
+  $("bd-max-label").textContent = c.smartSize ? "Max" : "Size";
+  applyTypography();
+}
+
+function syncCarouselPanel() {
+  $("visVal").textContent = state.visible;
+  $("visDec").disabled = state.visible <= 1;
+  $("visInc").disabled = state.visible >= 3 || state.visible >= state.banners.length;
+  $("dec").disabled = state.banners.length <= 1;
+  $("inc").disabled = state.banners.length >= 8;
+  $("countVal").textContent = state.banners.length;
+  setSegActive("#termsPlacement", btn => btn.dataset.place === state.termsPlacement);
+  $("autoplayOut").textContent = (state.autoplayMs / 1000).toFixed(1) + "s";
+  $("f-autoplay").value = state.autoplayMs / 1000;
+  $("t-autoplay").classList.toggle("on", state.autoplay);
+  $("autoplayField").style.display = state.autoplay ? "block" : "none";
+}
+
+function syncContentPanel() {
+  const b = state.banners[state.activeIdx];
   $("f-badge").value = b.badge || "";
   $("f-headline").value = b.headline || "";
   $("f-body").value = b.body || "";
@@ -1776,28 +1814,18 @@ function renderEditor() {
   $("f-terms").value = b.terms || "";
   $("f-bg1").value = b.bg.c1;
   $("f-bg2").value = b.bg.c2;
-
-  // Counters
   setCounter("c-badge", b.badge, LIMITS.badge);
   setCounter("c-headline", b.headline, LIMITS.headline);
   setCounter("c-body", b.body, LIMITS.body);
   setCounter("c-cta", b.cta, LIMITS.cta);
-
-  // Toggles
   $("t-badge").classList.toggle("on", b.showBadge);
   $("badge-field").style.display = b.showBadge ? "block" : "none";
-
-  // Bottom type
   setSegActive("#bottomType", btn => btn.dataset.bt === b.bottomType);
   $("cta-config").style.display = b.bottomType === "cta" ? "block" : "none";
   $("odds-config").style.display = b.bottomType === "odds" ? "block" : "none";
-
-  // Odds mode
   setSegActive("#oddsMode", btn => btn.dataset.om === b.oddsMode);
   $("threeway-config").style.display = b.oddsMode === "three-way" ? "block" : "none";
   $("boosted-config").style.display = b.oddsMode === "boosted" ? "block" : "none";
-
-  // Three-way fields
   for (let i = 0; i < 3; i++) {
     $("tw" + i + "l").value = b.oddsThreeWay[i].label;
     $("tw" + i + "o").value = b.oddsThreeWay[i].odds;
@@ -1805,19 +1833,14 @@ function renderEditor() {
   $("bs-label").value = b.oddsBoosted.label;
   $("bs-original").value = b.oddsBoosted.original;
   $("bs-boosted").value = b.oddsBoosted.boosted;
-
-  // BG
   setSegActive("#bgStyle", btn => btn.dataset.bg === b.bg.style);
   $("bg2Wrap").style.display = b.bg.style === "solid" ? "none" : "block";
-
-  // Asset
   if (b.asset) {
     $("assetPreview").style.display = "flex";
     $("assetThumb").src = b.asset.url;
     $("assetName").textContent = b.asset.name;
     $("uploadLabel").style.display = "none";
     $("asset-editor").style.display = "block";
-    // populate image editor controls
     const fit = b.asset.fit || "contain";
     const scale = b.asset.scale ?? 100;
     const posX = b.asset.posX ?? 50;
@@ -1832,8 +1855,6 @@ function renderEditor() {
     $("asset-editor").style.display = "none";
   }
   setSegActive("#assetPlacement", btn => btn.dataset.place === b.assetPlacement);
-
-  // Full background image previews
   const bgImg = b.bgImage || { mobile: null, desktop: null };
   ["Mobile", "Desktop"].forEach(dev => {
     const key = dev.toLowerCase();
@@ -1853,45 +1874,13 @@ function renderEditor() {
       prev.style.display = "none";
     }
   });
+}
 
-  // Per-device sliders / values
-  $("widthOut").textContent = c.width + "px";
-  widthInput.value = c.width;
-  $("heightOut").textContent = c.height + "px"; $("f-height").value = c.height;
-  $("radiusOut").textContent = c.radius + "px"; $("f-radius").value = c.radius;
-  $("gapOut").textContent = c.gap + "px"; $("f-gap").value = c.gap;
-  $("peekOut").textContent = c.peek + "%"; $("f-peek").value = c.peek;
-  $("assetWidthOut").textContent = c.assetWidth + "%"; $("f-assetWidth").value = c.assetWidth;
-  $("contentWidthOut").textContent = c.contentWidth + "%"; $("f-contentWidth").value = c.contentWidth;
-
-  $("visVal").textContent = state.visible;
-  $("visDec").disabled = state.visible <= 1;
-  $("visInc").disabled = state.visible >= 3 || state.visible >= state.banners.length;
-  $("dec").disabled = state.banners.length <= 1;
-  $("inc").disabled = state.banners.length >= 8;
-  $("countVal").textContent = state.banners.length;
-
-  setSegActive("#termsPlacement", btn => btn.dataset.place === state.termsPlacement);
-
-  $("autoplayOut").textContent = (state.autoplayMs / 1000).toFixed(1) + "s";
-  $("f-autoplay").value = state.autoplayMs / 1000;
-  $("t-autoplay").classList.toggle("on", state.autoplay);
-  $("autoplayField").style.display = state.autoplay ? "block" : "none";
-
-  // Typography
-  $("t-smart").classList.toggle("on", c.smartSize);
-  $("f-hlMin").value = c.hlMin; $("hlMinOut").textContent = c.hlMin;
-  $("f-hlMax").value = c.hlMax; $("hlMaxOut").textContent = c.hlMax;
-  $("f-bdMin").value = c.bdMin; $("bdMinOut").textContent = c.bdMin;
-  $("f-bdMax").value = c.bdMax; $("bdMaxOut").textContent = c.bdMax;
-  const ts = c.termsSize || 10;
-  $("f-termsSize").value = ts; $("termsSizeOut").textContent = ts + "px";
-  $("hl-min-row").style.display = c.smartSize ? "grid" : "none";
-  $("bd-min-row").style.display = c.smartSize ? "grid" : "none";
-  $("hl-max-label").textContent = c.smartSize ? "Max" : "Size";
-  $("bd-max-label").textContent = c.smartSize ? "Max" : "Size";
-
-  applyTypography();
+function renderEditor() {
+  syncHeader();
+  syncLayoutPanel();
+  syncCarouselPanel();
+  syncContentPanel();
 }
 
 function renderSwatches() {
@@ -2606,6 +2595,7 @@ function getSnapshot() {
     activeIdx: state.activeIdx,
     current: state.current,
     visible: state.visible,
+    activeTab: state.activeTab,
     presetData: state.presetData,
     banners: state.banners,
     screenshots: state.screenshots,
@@ -2712,6 +2702,8 @@ function applySnapshot(snap) {
   state.current = Math.max(0, Math.min(_maxCur, snap.current ?? 0));
   if (typeof snap.autoplay === "boolean") state.autoplay = snap.autoplay;
   if (typeof snap.autoplayMs === "number") state.autoplayMs = snap.autoplayMs;
+  const validTabs = ["layout", "carousel", "content", "context"];
+  if (snap.activeTab && validTabs.includes(snap.activeTab)) activateTab(snap.activeTab);
   return true;
 }
 
