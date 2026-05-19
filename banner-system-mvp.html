@@ -2307,6 +2307,7 @@ document.querySelectorAll("#verticalPicker button").forEach(btn => {
   btn.onclick = () => {
     state.vertical = btn.dataset.v;
     setSegActive("#verticalPicker", b => b === btn);
+    renderEditor();
     renderCarousel();
   };
 });
