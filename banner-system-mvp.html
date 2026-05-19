@@ -687,25 +687,24 @@
 
   .arrow {
     position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 40px; height: 40px;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.94);
+    top: 0;
+    width: 44px;
+    height: var(--banner-h, 220px);
+    background: rgba(0,0,0,0.42);
     border: 0;
-    color: #0B1220;
-    font-size: 18px;
+    color: white;
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.25);
     z-index: 5;
-    font-family: inherit;
+    padding: 0;
+    opacity: 0;
     transition: opacity 0.18s, background 0.18s;
   }
-  .arrow.prev { left: 12px; }
-  .arrow.next { right: 12px; }
-  .arrow:hover { background: white; }
-  .arrow:disabled { opacity: 0; pointer-events: none; }
+  .arrow.prev { left: 0; }
+  .arrow.next { right: 0; }
+  .carousel:hover .arrow:not(:disabled) { opacity: 1; }
+  .arrow:hover { background: rgba(0,0,0,0.6); }
+  .arrow:disabled { opacity: 0 !important; pointer-events: none; }
   .viewport.is-mobile .arrow { display: none; }
 
   .pagination-wrap {
@@ -2040,8 +2039,8 @@ function renderCarousel() {
       </div>
     </div>
     ${showArrows ? `
-      <button class="arrow prev" id="prev" ${state.current === 0 ? "disabled" : ""}>‹</button>
-      <button class="arrow next" id="next" ${state.current >= maxCurrent() ? "disabled" : ""}>›</button>
+      <button class="arrow prev" id="prev" ${state.current === 0 ? "disabled" : ""}><svg width="32" height="32" viewBox="0 0 32 32" fill="none"><path d="M19 8l-7 8 7 8" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="arrow next" id="next" ${state.current >= maxCurrent() ? "disabled" : ""}><svg width="32" height="32" viewBox="0 0 32 32" fill="none"><path d="M13 8l7 8-7 8" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     ` : ""}
   `;
 
