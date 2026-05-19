@@ -564,8 +564,8 @@
     padding: 28px 16px;
     overflow: auto;
   }
-  /* Desktop preset: no outer padding, frame fills the canvas edge-to-edge */
-  .viewport-wrap:has(.device-frame.is-desktop) { padding: 0; }
+  /* Desktop preset: small padding around the (possibly scaled) device-frame */
+  .viewport-wrap:has(.device-frame.is-desktop) { padding: 16px 12px; }
   .device-frame {
     display: flex;
     flex-direction: column;
@@ -624,8 +624,7 @@
     width: 100%;
   }
   .device-frame.is-desktop .device-screen {
-    width: 100%;
-    max-width: none;
+    max-width: none; /* allow virtual width to exceed monitor; transform: scale() handles fit */
     background: #fff;
     overflow: hidden;
   }
@@ -1051,9 +1050,17 @@
       <div class="tab-panel active" data-panel="layout">
         <div class="panel-meta">Per-device · <strong id="presetPill">Desktop</strong></div>
 
+        <div class="field" id="widthPresetField" style="display:none;">
+          <span>Viewport preset</span>
+          <div class="seg" id="widthPreset" style="margin-top:6px;">
+            <button type="button" data-w="1200">1200</button>
+            <button type="button" data-w="1440">1440</button>
+            <button type="button" data-w="1920">1920</button>
+          </div>
+        </div>
         <label class="field">
-          <span>Width <strong id="widthOut">1200px</strong></span>
-          <input type="number" id="widthInput" min="320" max="2400" step="1" value="1200" />
+          <span>Width <strong id="widthOut">1440px</strong></span>
+          <input type="number" id="widthInput" min="320" max="2400" step="1" value="1440" />
         </label>
         <label class="field">
           <span>Banner height <strong id="heightOut">300px</strong></span>
@@ -1536,7 +1543,7 @@ const LIMITS = { headline: 60, body: 120, badge: 20, cta: 20 };
 // Per-device presets. Mobile is unified (one blob for both verticals).
 // Desktop splits per vertical so casino-desktop & sportsbook-desktop can differ.
 const mobileDefault  = { width: 375,  height: 220, radius: 12, gap: 8,  peek: 18, assetWidth: 50, contentWidth: 60, smartSize: true, hlMin: 14, hlMax: 26, bdMin: 11, bdMax: 13, termsSize: 10 };
-const desktopDefault = { width: 1200, height: 300, radius: 12, gap: 12, peek: 18, assetWidth: 50, contentWidth: 50, smartSize: true, hlMin: 18, hlMax: 44, bdMin: 11, bdMax: 16, termsSize: 10 };
+const desktopDefault = { width: 1440, height: 300, radius: 12, gap: 12, peek: 18, assetWidth: 50, contentWidth: 50, smartSize: true, hlMin: 18, hlMax: 44, bdMin: 11, bdMax: 16, termsSize: 10 };
 const defaultPresetData = {
   mobile:  { ...mobileDefault },
   desktop: {
@@ -1774,6 +1781,8 @@ function syncLayoutPanel() {
   const c = cfg();
   $("widthOut").textContent = c.width + "px";
   widthInput.value = c.width;
+  $("widthPresetField").style.display = state.activePreset === "desktop" ? "block" : "none";
+  setSegActive("#widthPreset", btn => +btn.dataset.w === c.width);
   $("heightOut").textContent = c.height + "px"; $("f-height").value = c.height;
   $("radiusOut").textContent = c.radius + "px"; $("f-radius").value = c.radius;
   $("gapOut").textContent = c.gap + "px"; $("f-gap").value = c.gap;
@@ -2057,7 +2066,31 @@ function renderCarousel() {
 
   updateMeta();
   resetAutoplay();
+  applyViewportFit();
   scheduleSave();
+}
+
+// Scale the desktop device-frame to fit the available canvas width.
+// Lets the user pick virtual widths (1200/1440/1920) larger than their monitor.
+function applyViewportFit() {
+  const frame = $("deviceFrame");
+  if (!frame) return;
+  if (state.activePreset !== "desktop") {
+    frame.style.transform = "";
+    frame.style.transformOrigin = "";
+    frame.style.marginBottom = "";
+    return;
+  }
+  const wrap = document.querySelector(".viewport-wrap");
+  if (!wrap) return;
+  const avail = Math.max(320, wrap.clientWidth - 24);
+  const target = cfg().width;
+  const scale = Math.min(1, avail / target);
+  frame.style.transformOrigin = "top center";
+  frame.style.transform = `scale(${scale})`;
+  // transform doesn't shrink layout box — reserve negative bottom margin so scrollbar matches visual height
+  const h = frame.offsetHeight;
+  frame.style.marginBottom = (h * (scale - 1)) + "px";
 }
 
 function goTo(i, smooth = true) {
@@ -2283,8 +2316,16 @@ widthInput.oninput = (e) => {
   const w = Math.max(320, Math.min(2400, parseInt(e.target.value, 10) || 320));
   cfg().width = w;
   $("widthOut").textContent = w + "px";
-  renderCarousel();
+  renderEditor(); renderCarousel();
 };
+
+// Desktop viewport width presets (1200 / 1440 / 1920)
+document.querySelectorAll("#widthPreset button").forEach(btn => {
+  btn.onclick = () => {
+    cfg().width = parseInt(btn.dataset.w, 10);
+    renderEditor(); renderCarousel();
+  };
+});
 
 // Per-device parametric sliders
 const onPresetSlider = (id, prop, fmt) => {
@@ -2852,6 +2893,12 @@ renderSwatches();
 renderEditor();
 renderCarousel();
 initialized = true;
+
+// Recompute desktop scale-to-fit when the canvas resizes (window, sidebar toggle).
+const _viewportWrap = document.querySelector(".viewport-wrap");
+if (_viewportWrap && typeof ResizeObserver !== "undefined") {
+  new ResizeObserver(() => applyViewportFit()).observe(_viewportWrap);
+}
 if (stored) setSaveStatus(`Restored from ${stored.savedAt ? stored.savedAt.slice(0, 16).replace("T", " ") : "browser"}`, "ok");
 else if (bootstrapped) setSaveStatus("Loaded baked-in defaults", "ok");
 else setSaveStatus("Ready (no saved data yet)", "ok");
