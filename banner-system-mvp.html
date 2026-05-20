@@ -753,12 +753,13 @@
   }
   .banner-overlay img {
     position: absolute;
-    top: 0;
-    left: 0;
+    top: 50%;
+    left: 50%;
     height: 100%;
     width: auto;
-    transform: scale(var(--ov-s, 1));
-    transform-origin: top left;
+    transform: translate(-50%, -50%) scale(var(--ov-s, 1));
+    transform-origin: center center;
+    mix-blend-mode: screen;
   }
 
   /* Asset image — same behavior on mobile/tablet/desktop */
