@@ -754,11 +754,10 @@
   .banner-overlay img {
     position: absolute;
     top: 50%;
-    left: 50%;
+    left: var(--ov-x, 50%);
     height: 100%;
     width: auto;
     transform: translate(-50%, -50%) scale(var(--ov-s, 1));
-    transform-origin: center center;
     mix-blend-mode: screen;
   }
 
@@ -1351,6 +1350,10 @@
           <span>Size <strong id="overlayOut">100%</strong></span>
           <input type="range" id="f-overlay" min="50" max="300" step="5" value="100" />
         </label>
+        <label class="field" id="overlay-pos-field" style="display:none;">
+          <span>Horizontal position <strong id="overlayXOut">50%</strong></span>
+          <input type="range" id="f-overlay-x" min="0" max="100" step="1" value="50" />
+        </label>
 
         <div class="panel-sub-title">Asset image</div>
         <label class="upload" id="uploadLabel">
@@ -1903,8 +1906,11 @@ function syncContentPanel() {
   $("preset-hint").style.display = b.bg.preset ? "block" : "none";
   $("t-overlay").classList.toggle("on", !!b.showOverlay);
   $("overlay-size-field").style.display = b.showOverlay ? "block" : "none";
+  $("overlay-pos-field").style.display = b.showOverlay ? "block" : "none";
   $("f-overlay").value = b.overlaySize ?? 100;
   $("overlayOut").textContent = (b.overlaySize ?? 100) + "%";
+  $("f-overlay-x").value = b.overlayX ?? 50;
+  $("overlayXOut").textContent = (b.overlayX ?? 50) + "%";
   if (b.asset) {
     $("assetPreview").style.display = "flex";
     $("assetThumb").src = b.asset.url;
@@ -2029,7 +2035,7 @@ function renderBanner(b) {
   return `
     <div class="${classes}" style="--asset-w: ${aw}%; --content-w: ${contentW}%; ${assetVars}">
       <div class="banner-bg" style="background: ${bgCss(b)}"></div>
-      ${b.showOverlay ? `<div class="banner-overlay" style="--ov-s: ${(b.overlaySize ?? 100) / 100}"><img src="${STREAK_DATA_URL}" alt=""></div>` : ""}
+      ${b.showOverlay ? `<div class="banner-overlay" style="--ov-x: ${b.overlayX ?? 50}%; --ov-s: ${(b.overlaySize ?? 100) / 100}"><img src="${STREAK_DATA_URL}" alt=""></div>` : ""}
       ${hasAsset ? `
         <div class="banner-asset ${isBleed ? 'bleed' : ''}">
           <img src="${b.asset.url}" alt="" />
@@ -2483,6 +2489,12 @@ $("f-overlay").oninput = (e) => {
   $("overlayOut").textContent = e.target.value + "%";
   renderCarousel();
 };
+$("f-overlay-x").oninput = (e) => {
+  const b = state.banners[state.activeIdx];
+  b.overlayX = parseInt(e.target.value, 10);
+  $("overlayXOut").textContent = e.target.value + "%";
+  renderCarousel();
+};
 
 $("t-badge").onclick = () => {
   const b = state.banners[state.activeIdx];
@@ -2765,6 +2777,7 @@ function normaliseBanner(b) {
     assetPlacement: "right",
     showOverlay: false,
     overlaySize: 100,
+    overlayX: 50,
   };
   const merged = { ...defaults, ...b };
   merged.bg = { ...defaults.bg, ...(b.bg || {}), preset: (b.bg && b.bg.preset) || null };
