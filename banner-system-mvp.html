@@ -743,12 +743,43 @@
 
   .banner-bg { position: absolute; inset: 0; z-index: 0; }
 
+  /* Decorative overlay: above bg, behind asset + content */
+  .banner-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .banner-overlay::before {
+    content: '';
+    position: absolute;
+    width: var(--ov-w, 80px);
+    height: 300%;
+    top: -100%;
+    left: 18%;
+    background: linear-gradient(to right,
+      transparent 0%,
+      rgba(110,185,255,0.05) 18%,
+      rgba(165,215,255,0.30) 42%,
+      rgba(225,242,255,0.72) 48%,
+      rgba(255,255,255,0.88) 50%,
+      rgba(225,242,255,0.72) 52%,
+      rgba(165,215,255,0.30) 58%,
+      rgba(110,185,255,0.05) 82%,
+      transparent 100%
+    );
+    transform: rotate(-28deg);
+    transform-origin: top center;
+    filter: blur(2px);
+  }
+
   /* Asset image — same behavior on mobile/tablet/desktop */
   .banner-asset {
     position: absolute;
     top: 0; bottom: 0; right: 0;
     width: var(--asset-w, 50%);
-    z-index: 1;
+    z-index: 2;
     display: block;
     pointer-events: none;
     overflow: visible; /* allow image to overflow; banner clips */
@@ -1290,8 +1321,9 @@
             <input type="color" id="f-bg2" value="#16213e" />
           </label>
         </div>
-        <span class="hint" style="display:block; margin-bottom:6px;">Quick swatches</span>
+        <span class="hint" style="display:block; margin-bottom:6px;">Preset gradients</span>
         <div class="swatch-row" id="swatches"></div>
+        <div id="preset-hint" class="hint" style="display:none; margin-top:4px; color: var(--accent);">Preset active — edit a color to clear</div>
 
         <div class="config-block-title" style="margin-top: 16px;">Full background image (per device)</div>
         <div class="hint" style="margin-bottom: 8px;">
@@ -1321,6 +1353,16 @@
             <button id="bgDesktopClear" title="Remove">×</button>
           </div>
         </div>
+
+        <div class="panel-sub-title">Light streak overlay</div>
+        <div class="field row" style="align-items:center;">
+          <span>Show overlay</span>
+          <div class="switch" id="t-overlay"></div>
+        </div>
+        <label class="field" id="overlay-size-field" style="display:none;">
+          <span>Beam width <strong id="overlayOut">80px</strong></span>
+          <input type="range" id="f-overlay" min="20" max="400" step="4" value="80" />
+        </label>
 
         <div class="panel-sub-title">Asset image</div>
         <label class="upload" id="uploadLabel">
@@ -1543,12 +1585,17 @@ const presets = [
 ];
 
 const swatchPresets = [
-  ["#1a1a2e", "#16213e"], ["#7C3AED", "#DB2777"],
-  ["#0F766E", "#1E3A8A"], ["#14B8A6", "#1E3A8A"],
-  ["#1E40AF", "#0EA5E9"], ["#111827", "#374151"],
-  ["#DC2626", "#7F1D1D"], ["#059669", "#064E3B"],
-  ["#9333EA", "#4C1D95"], ["#F59E0B", "#92400E"],
-  ["#0B1220", "#1F2937"], ["#FF6B6B", "#FFD93D"],
+  `radial-gradient(54.17% 149.11% at 50% 71.43%, #00C5FC 0%, #00538E 100%)`,
+  `radial-gradient(54.17% 149.11% at 50% 71.43%, #474747 0%, #232323 100%)`,
+  `radial-gradient(112.96% 52.2% at 51.54% 91.21%, #A8EFFD 0%, #41A0DD 41.35%), radial-gradient(89.25% 106.61% at 51.32% 28.02%, #ABF2FE 0%, rgba(99,185,231,0) 78.9%)`,
+  `linear-gradient(90deg, #41DF9A 0%, #3CB8B4 100%)`,
+  `linear-gradient(90deg, #6079EA 0%, #17EAD9 100%)`,
+  `linear-gradient(360deg, #E0F017 -6.59%, #1F8B16 40.66%), radial-gradient(84.21% 131.87% at 50.66% 2.2%, #E5F318 0%, rgba(28,137,22,0) 100%)`,
+  `radial-gradient(187.96% 517.44% at 7.68% -19.23%, #1E1E1E 0%, #26A80E 100%), radial-gradient(86.88% 226.37% at 89.69% 0%, #9BEA2D 2.4%, rgba(35,82,26,0) 74.04%)`,
+  `radial-gradient(58.77% 147.25% at 48.68% 65.93%, #D66DCD 0%, #A3006F 78.24%, #A3006F 86.5%), radial-gradient(69.08% 180.15% at 69.08% 78.02%, rgba(41,4,142,0) 0%, #29048E 66%, #1F0573 77.5%, #0A083F 100%), radial-gradient(84% 77.32% at 100% -2.75%, #39005F 2.62%, rgba(92,47,150,0) 100%), radial-gradient(47.15% 98.12% at 0% 96.15%, #39005F 2.62%, rgba(92,47,150,0) 100%)`,
+  `linear-gradient(90deg, #FBD589 0%, #F48D82 100%)`,
+  `linear-gradient(90deg, #DA5773 0%, #8121D7 100%)`,
+  `linear-gradient(90deg, #DD3CC7 0%, #7287E5 100%)`,
 ];
 
 const LIMITS = { headline: 60, body: 120, badge: 20, cta: 20 };
@@ -1642,11 +1689,13 @@ function escapeHtml(s) {
 }
 
 function bgCss(b) {
-  // Per-device full background image wins over gradient/solid
+  // Per-device full background image wins over everything
   const bgImg = b.bgImage && b.bgImage[state.activePreset];
   if (bgImg && bgImg.url) {
     return `url('${bgImg.url}') center/cover no-repeat`;
   }
+  // Swatch preset (arbitrary CSS gradient string)
+  if (b.bg.preset) return b.bg.preset;
   const { style, c1, c2 } = b.bg;
   if (style === "solid") return c1;
   return `linear-gradient(135deg, ${c1} 0%, ${c2} 100%)`;
@@ -1861,6 +1910,11 @@ function syncContentPanel() {
   $("bs-boosted").value = b.oddsBoosted.boosted;
   setSegActive("#bgStyle", btn => btn.dataset.bg === b.bg.style);
   $("bg2Wrap").style.display = b.bg.style === "solid" ? "none" : "block";
+  $("preset-hint").style.display = b.bg.preset ? "block" : "none";
+  $("t-overlay").classList.toggle("on", !!b.showOverlay);
+  $("overlay-size-field").style.display = b.showOverlay ? "block" : "none";
+  $("f-overlay").value = b.overlaySize ?? 80;
+  $("overlayOut").textContent = (b.overlaySize ?? 80) + "px";
   if (b.asset) {
     $("assetPreview").style.display = "flex";
     $("assetThumb").src = b.asset.url;
@@ -1911,17 +1965,14 @@ function renderEditor() {
 
 function renderSwatches() {
   swatchesEl.innerHTML = "";
-  swatchPresets.forEach(([c1, c2]) => {
+  swatchPresets.forEach(grad => {
     const s = document.createElement("button");
     s.type = "button";
     s.className = "swatch";
-    s.style.cssText = `background: linear-gradient(135deg, ${c1}, ${c2}); border: 2px solid transparent; padding: 0;`;
-    s.setAttribute("aria-label", `Set gradient ${c1} to ${c2}`);
-    s.title = `${c1} → ${c2}`;
+    s.style.cssText = `background: ${grad}; border: 2px solid transparent; padding: 0;`;
     s.onclick = () => {
       const b = state.banners[state.activeIdx];
-      b.bg.c1 = c1; b.bg.c2 = c2;
-      if (b.bg.style === "solid") b.bg.style = "gradient";
+      b.bg.preset = grad;
       renderEditor();
       renderCarousel();
     };
@@ -1988,6 +2039,7 @@ function renderBanner(b) {
   return `
     <div class="${classes}" style="--asset-w: ${aw}%; --content-w: ${contentW}%; ${assetVars}">
       <div class="banner-bg" style="background: ${bgCss(b)}"></div>
+      ${b.showOverlay ? `<div class="banner-overlay" style="--ov-w: ${b.overlaySize ?? 80}px"></div>` : ""}
       ${hasAsset ? `
         <div class="banner-asset ${isBleed ? 'bleed' : ''}">
           <img src="${b.asset.url}" alt="" />
@@ -2430,6 +2482,18 @@ onField("f-cta", "cta", "c-cta", LIMITS.cta);
 onField("f-terms", "terms");
 onField("f-badge", "badge", "c-badge", LIMITS.badge);
 
+$("t-overlay").onclick = () => {
+  const b = state.banners[state.activeIdx];
+  b.showOverlay = !b.showOverlay;
+  renderEditor(); renderCarousel();
+};
+$("f-overlay").oninput = (e) => {
+  const b = state.banners[state.activeIdx];
+  b.overlaySize = parseInt(e.target.value, 10);
+  $("overlayOut").textContent = e.target.value + "px";
+  renderCarousel();
+};
+
 $("t-badge").onclick = () => {
   const b = state.banners[state.activeIdx];
   b.showBadge = !b.showBadge;
@@ -2467,12 +2531,14 @@ $("bs-original").oninput = (e) => { state.banners[state.activeIdx].oddsBoosted.o
 $("bs-boosted").oninput = (e) => { state.banners[state.activeIdx].oddsBoosted.boosted = e.target.value; patchBanner(state.activeIdx, 'odds-boosted'); };
 
 // BG colors
-$("f-bg1").oninput = (e) => { state.banners[state.activeIdx].bg.c1 = e.target.value; patchBanner(state.activeIdx, 'bg'); };
-$("f-bg2").oninput = (e) => { state.banners[state.activeIdx].bg.c2 = e.target.value; patchBanner(state.activeIdx, 'bg'); };
+$("f-bg1").oninput = (e) => { const b = state.banners[state.activeIdx]; b.bg.c1 = e.target.value; b.bg.preset = null; $("preset-hint").style.display = "none"; patchBanner(state.activeIdx, 'bg'); };
+$("f-bg2").oninput = (e) => { const b = state.banners[state.activeIdx]; b.bg.c2 = e.target.value; b.bg.preset = null; $("preset-hint").style.display = "none"; patchBanner(state.activeIdx, 'bg'); };
 
 document.querySelectorAll("#bgStyle button").forEach(btn => {
   btn.onclick = () => {
-    state.banners[state.activeIdx].bg.style = btn.dataset.bg;
+    const b = state.banners[state.activeIdx];
+    b.bg.style = btn.dataset.bg;
+    b.bg.preset = null;
     renderEditor(); renderCarousel();
   };
 });
@@ -2703,13 +2769,15 @@ function normaliseBanner(b) {
     ],
     oddsBoosted: { label: "", original: "", boosted: "" },
     terms: "",
-    bg: { style: "gradient", c1: "#1a1a2e", c2: "#16213e" },
+    bg: { style: "gradient", c1: "#1a1a2e", c2: "#16213e", preset: null },
     bgImage: { mobile: null, desktop: null },
     asset: null,
     assetPlacement: "right",
+    showOverlay: false,
+    overlaySize: 80,
   };
   const merged = { ...defaults, ...b };
-  merged.bg = { ...defaults.bg, ...(b.bg || {}) };
+  merged.bg = { ...defaults.bg, ...(b.bg || {}), preset: (b.bg && b.bg.preset) || null };
   merged.bgImage = { ...defaults.bgImage, ...(b.bgImage || {}) };
   merged.oddsBoosted = { ...defaults.oddsBoosted, ...(b.oddsBoosted || {}) };
   merged.oddsThreeWay = (Array.isArray(b.oddsThreeWay) && b.oddsThreeWay.length === 3)
