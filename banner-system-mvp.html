@@ -29,6 +29,44 @@
     overflow: hidden;
   }
 
+  /* Top navigation bar — always visible */
+  .top-bar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 48px;
+    z-index: 100;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .top-bar-brand {
+    font-size: 12px; font-weight: 700;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--ink-2);
+    white-space: nowrap;
+    margin-right: 4px;
+  }
+  .top-bar-divider {
+    width: 1px; height: 20px;
+    background: var(--border);
+    flex-shrink: 0;
+    margin: 0 2px;
+  }
+  .top-bar-group {
+    display: flex; align-items: center; gap: 7px;
+    flex-shrink: 0;
+  }
+  .top-bar-label {
+    font-size: 10px; font-weight: 600;
+    letter-spacing: 0.07em; text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .top-bar-spacer { flex: 1; }
+
   .app {
     position: relative;
     height: 100vh;
@@ -42,7 +80,7 @@
   }
   .sidebar {
     position: absolute;
-    top: 0; left: 0; bottom: 0;
+    top: 48px; left: 0; bottom: 0;
     width: 340px;
     z-index: 30;
     box-shadow: 4px 0 24px rgba(0,0,0,0.45);
@@ -53,22 +91,20 @@
     box-shadow: none;
   }
 
+  /* Show-sidebar button lives in the top-bar; hidden when sidebar visible */
   .show-sidebar-btn {
-    position: fixed;
-    top: 14px; left: 14px;
-    z-index: 50;
-    width: 36px; height: 36px;
+    display: none;
+    width: 28px; height: 28px;
     border-radius: 8px;
-    background: var(--panel);
+    background: var(--panel-2);
     border: 1px solid var(--border);
     color: var(--ink-2);
     cursor: pointer;
-    font-size: 16px;
+    font-size: 14px;
     font-family: inherit;
-    display: none;
     align-items: center; justify-content: center;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
     transition: background 0.15s, color 0.15s;
+    flex-shrink: 0;
   }
   .show-sidebar-btn:hover { background: var(--border); color: var(--ink); }
   .app.sidebar-hidden .show-sidebar-btn { display: flex; }
@@ -82,21 +118,15 @@
     overflow: hidden;
   }
 
-  /* Persistent header */
+  /* Persistent sidebar header (just the hide button row now) */
   .sidebar-header {
-    padding: 14px 16px 12px;
+    padding: 10px 12px;
     border-bottom: 1px solid var(--border);
     background: var(--panel);
     flex-shrink: 0;
-  }
-  .sidebar-header h1 {
-    font-size: 14px; font-weight: 700; letter-spacing: 0.04em;
-    text-transform: uppercase; color: var(--ink-2);
-    margin: 0;
-  }
-  .brand-row {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
   }
   .icon-btn {
     width: 28px; height: 28px;
@@ -111,21 +141,9 @@
     transition: background 0.15s, color 0.15s;
   }
   .icon-btn:hover { background: var(--border); color: var(--ink); }
-  .header-pill-row {
-    display: grid;
-    grid-template-columns: 56px 1fr;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 6px;
-  }
-  .header-pill-label {
-    font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
-    text-transform: uppercase; color: var(--ink-3);
-  }
   .seg-mini button { font-size: 11px; padding: 5px 8px; }
 
   .save-status.mini {
-    margin-top: 8px;
     padding: 0;
     font-size: 10px;
   }
@@ -536,6 +554,7 @@
   .canvas {
     position: relative;
     overflow: hidden;
+    padding-top: 48px; /* reserve space for global top-bar */
     background:
       radial-gradient(circle at 20% 0%, rgba(79,123,255,0.08), transparent 40%),
       radial-gradient(circle at 80% 100%, rgba(46,91,255,0.06), transparent 40%),
@@ -1048,36 +1067,39 @@
 </script>
 
 <div class="app">
-  <button class="show-sidebar-btn" id="btnShowSidebar" title="Show panel">»</button>
+  <!-- ============ TOP BAR (always visible) ============ -->
+  <header class="top-bar">
+    <button class="show-sidebar-btn" id="btnShowSidebar" title="Show panel">»</button>
+    <span class="top-bar-brand">Banner Playground</span>
+    <div class="top-bar-divider"></div>
+    <div class="top-bar-group">
+      <span class="top-bar-label">Device</span>
+      <div class="seg seg-mini" id="devicePreset">
+        <button data-name="mobile">Mobile</button>
+        <button data-name="desktop" class="active">Desktop</button>
+      </div>
+    </div>
+    <div class="top-bar-divider"></div>
+    <div class="top-bar-group">
+      <span class="top-bar-label">Vertical</span>
+      <div class="seg seg-mini" id="verticalPicker">
+        <button data-v="casino">Casino</button>
+        <button data-v="sportsbook" class="active">Sportsbook</button>
+      </div>
+    </div>
+    <div class="top-bar-spacer"></div>
+    <div class="save-status mini" id="saveStatus">
+      <span class="dot-status"></span>
+      <span id="saveStatusText">Ready</span>
+    </div>
+    <button class="icon-btn" id="btnSaveDrawer" title="Save &amp; Load">⚙</button>
+  </header>
+
   <!-- ============ SIDEBAR ============ -->
   <aside class="sidebar">
-    <!-- HEADER (persistent) -->
+    <!-- HEADER (just the collapse button) -->
     <div class="sidebar-header">
-      <div class="brand-row">
-        <h1>Banner Playground</h1>
-        <div style="display: flex; gap: 6px;">
-          <button class="icon-btn" id="btnSaveDrawer" title="Save &amp; Load">⚙</button>
-          <button class="icon-btn" id="btnHideSidebar" title="Hide panel (full canvas)">«</button>
-        </div>
-      </div>
-      <div class="header-pill-row">
-        <span class="header-pill-label">Device</span>
-        <div class="seg seg-mini" id="devicePreset">
-          <button data-name="mobile">Mobile</button>
-          <button data-name="desktop" class="active">Desktop</button>
-        </div>
-      </div>
-      <div class="header-pill-row">
-        <span class="header-pill-label">Vertical</span>
-        <div class="seg seg-mini" id="verticalPicker">
-          <button data-v="casino">Casino</button>
-          <button data-v="sportsbook" class="active">Sportsbook</button>
-        </div>
-      </div>
-      <div class="save-status mini" id="saveStatus">
-        <span class="dot-status"></span>
-        <span id="saveStatusText">Ready</span>
-      </div>
+      <button class="icon-btn" id="btnHideSidebar" title="Hide panel (full canvas)">«</button>
     </div>
 
     <!-- TABS -->
