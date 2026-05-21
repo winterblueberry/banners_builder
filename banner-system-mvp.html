@@ -151,12 +151,21 @@
   /* Tab bar */
   .sidebar-tabs {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: 1fr; /* expands to 4 in pro-mode */
     background: var(--panel);
     border-bottom: 1px solid var(--border);
     padding: 0 8px;
     flex-shrink: 0;
   }
+  /* Pro-only tabs hidden in simple mode */
+  .sidebar-tabs .tab[data-tab="layout"],
+  .sidebar-tabs .tab[data-tab="carousel"],
+  .sidebar-tabs .tab[data-tab="context"] { display: none; }
+  /* Unlock all tabs in pro mode */
+  .app.pro-mode .sidebar-tabs { grid-template-columns: repeat(4, 1fr); }
+  .app.pro-mode .sidebar-tabs .tab[data-tab="layout"],
+  .app.pro-mode .sidebar-tabs .tab[data-tab="carousel"],
+  .app.pro-mode .sidebar-tabs .tab[data-tab="context"] { display: block; }
   .sidebar-tabs .tab {
     background: transparent;
     border: 0;
@@ -1526,6 +1535,12 @@
         <span>Auto-save to browser</span>
         <div class="switch on" id="t-autosave"></div>
       </div>
+      <hr style="border:none;border-top:1px solid var(--border);margin:16px 0 12px;" />
+      <div class="toggle-row">
+        <span style="font-weight:600;">Pro controls</span>
+        <div class="switch" id="t-promode"></div>
+      </div>
+      <p class="hint" style="margin-top:5px;">Unlocks Layout, Carousel &amp; Context tabs.</p>
     </div>
   </aside>
 
@@ -2324,6 +2339,26 @@ function activateTab(name) {
 document.querySelectorAll(".sidebar-tabs .tab").forEach(t => {
   t.onclick = () => activateTab(t.dataset.tab);
 });
+
+// Pro mode — persisted separately in localStorage, independent of banner state
+const PRO_KEY = "banners_pro_mode";
+let proMode = localStorage.getItem(PRO_KEY) === "true";
+const PRO_TABS = ["layout", "carousel", "context"];
+
+function applyProMode() {
+  appEl.classList.toggle("pro-mode", proMode);
+  $("t-promode").classList.toggle("on", proMode);
+  // If pro mode just turned off and we're on a pro-only tab, fall back to Content
+  if (!proMode && PRO_TABS.includes(state.activeTab)) {
+    activateTab("content");
+  }
+}
+$("t-promode").onclick = () => {
+  proMode = !proMode;
+  localStorage.setItem(PRO_KEY, proMode);
+  applyProMode();
+};
+applyProMode(); // apply on init
 
 // Sidebar collapse/show
 const appEl = document.querySelector(".app");
