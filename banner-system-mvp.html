@@ -2340,6 +2340,11 @@ document.querySelectorAll(".sidebar-tabs .tab").forEach(t => {
   t.onclick = () => activateTab(t.dataset.tab);
 });
 
+// Sidebar collapse/show
+const appEl = document.querySelector(".app");
+$("btnHideSidebar").onclick = () => appEl.classList.add("sidebar-hidden");
+$("btnShowSidebar").onclick = () => appEl.classList.remove("sidebar-hidden");
+
 // Pro mode — persisted separately in localStorage, independent of banner state
 const PRO_KEY = "banners_pro_mode";
 let proMode = localStorage.getItem(PRO_KEY) === "true";
@@ -2359,11 +2364,6 @@ $("t-promode").onclick = () => {
   applyProMode();
 };
 applyProMode(); // apply on init
-
-// Sidebar collapse/show
-const appEl = document.querySelector(".app");
-$("btnHideSidebar").onclick = () => appEl.classList.add("sidebar-hidden");
-$("btnShowSidebar").onclick = () => appEl.classList.remove("sidebar-hidden");
 
 // Save & Load drawer
 let _drawerReturnFocus = null;
